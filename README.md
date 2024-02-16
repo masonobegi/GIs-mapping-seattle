@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-This project aims to tackle the significant challenge of climate pollution from buildings in Seattle, focusing on the impact of fossil fuel consumption on greenhouse gas emissions. Through comprehensive GIS analysis and the development of a Shiny app, we intend to visualize energy usage patterns, identify emissions hotspots, and explore opportunities for cleaner energy solutions. Our goal is to provide actionable insights that can guide policy changes and promote environmental sustainability.
+Our project tackles climate pollution from Seattle's buildings, emphasizing the unequal impact on BIPOC communities through fossil fuel use. Utilizing the Racial and Social Equity Composite Index, we apply an equity lens to analyze energy usage and emissions across neighborhoods. Our analysis extends to developing forecasting models from the City of Seattle's Open Data, aiming to predict future emissions under current practices versus cleaner energy scenarios. This approach not only seeks to reduce the city's climate pollution but also ensures equitable benefits distribution, guiding policy and community actions towards a sustainable and inclusive urban environment.
 
 ## Datasets Overview
 
