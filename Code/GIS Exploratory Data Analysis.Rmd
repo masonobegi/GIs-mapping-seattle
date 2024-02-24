@@ -81,7 +81,7 @@ merged_data_df <- merged_data_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU
 
 head(merged_data_df)
 
-#sum(is.nan(merged_data_df$))
+sapply(merged_data_df, function(x) sum(is.na(x)))
 #there are no missing values
 
 #making the QUINTILE labels uniform across the columns (Highest priority value differs)
