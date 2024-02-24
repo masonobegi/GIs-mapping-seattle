@@ -60,6 +60,42 @@ merged_data_df <- inner_join(pse_data_df, equity_data_df, by = c("Census_Tra" = 
 # View the merged dataframe
 head(merged_data_df)
 
+```
+
+
+This code filters pse_data for entries from the year 2023 and ensures that the identifiers (Census_Tra from pse_data_2023 and GEOID from equity_data) are of compatible data types for merging. It then converts both datasets to regular dataframes, explicitly removing the geometry column from equity_data to simplify the merge operation. 
+
+An inner_join is performed based on these identifiers, merging attributes from equity_data into pse_data_2023 where their identifiers match. Finally, after cleaning, the merged dataframe is converted back into an sf object by reattaching the geometry from pse_data_2023. 
+
+This process ensures a streamlined dataset that combines relevant attributes from both sources, based on the year 2023 and matching geographic identifiers, for detailed spatial analysis.
+
+
+```{r GIS 2023 - Clean Data}
+#drop unnecessary columns from the equity data portion of the joined data set
+merged_data_df = subset(merged_data_df, select = c(OBJECTID_1, ID, CAL_YEAR, Cal_Qtr,Census_Tra, Sector, Grouped_Fl,Usage_MMBT, Number_Acc, Emissions_, USAGEPERCA, EMISSIONSP, RSE_Quinti, SHAPE_Leng.x, SHAPE_Area.x, COMPOSITE_,RACE_ELL_O,SOCIOECON_,HEALTH_DIS,SOCIOECO_2,SHAPE_Leng.y,SHAPE_Area.y, RACE_ELL_1,HEALTH_D_1,COMPOSIT_1, COMPOSIT_2,RACE_ELL_2,SOCIOECO_1,HEALTH_D_2))
+
+head(merged_data_df)
+
+#renaming columns to names in the data table to make it less confusing
+merged_data_df <- merged_data_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU=Usage_MMBT, Number_Accts=Number_Acc, Emissions_MTCO2E=Emissions_, USAGEPERCAPITA_MMBTU=USAGEPERCA, EMISSIONSPERCAPITA_MTCO2E=EMISSIONSP, RSE_Quintile=RSE_Quinti, SHAPE_Length.x=SHAPE_Leng.x, SHAPE_Length.y=SHAPE_Leng.y, COMPOSITE_PERCENTILE=COMPOSITE_, RACE_ELL_ORIGINS_QUINTILE=RACE_ELL_1, SOCIOECON_DISADV_QUINTILE=SOCIOECO_2, HEALTH_DISADV_QUINTILE=HEALTH_D_1, COMPOSITE_QUINTILE=COMPOSIT_1, COMPOSITE_SCORE=COMPOSIT_2, RACE_ELL_ORIGINS_SCORE=RACE_ELL_2, SOCIOECON_DISADV_SCORE= SOCIOECO_1, HEALTH_DISADV_SCORE=HEALTH_D_2, RACE_ELL_ORIGINS_PERCENTILE=RACE_ELL_O, SOCIOECON_DISADV_PERCENTILE=SOCIOECON_, HEALTH_DISADV_PERCENTILE=HEALTH_DIS)
+
+head(merged_data_df)
+
+#sum(is.nan(merged_data_df$))
+#there are no missing values
+
+#making the QUINTILE labels uniform across the columns (Highest priority value differs)
+merged_data_df[merged_data_df == 'Highest Equity Priority' | merged_data_df == 'Highest Equity Priority/Most Disadvantaged' | merged_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+
+#unique(merged_data_df$RACE_ELL_ORIGINS_QUINTILE)
+#unique(merged_data_df$SOCIOECON_DISADV_QUINTILE)
+#unique(merged_data_df$HEALTH_DISADV_QUINTILE)
+#unique(merged_data_df$COMPOSITE_QUINTILE)
+#unique(merged_data_df$RSE_Quintile)
+```
+This code selects a subset of relevant columns from the merged dataframe to reduce the number of parameters and only ones that we are likely to use remain. Then, it renames the columns because the abbreviations were unclear about what data is contained in the column. It checked for missing values in the columns but there were none. Finally, it changes the Highest Priority level label to simply 'Highest' in the QUINTILE columns because they all had different values for it and this fits better into with the other labels that are also more simple, such as 'Lowest'. 
+
+```{r Reattach the geometry to merged_data_df}
 # Step 5: Reattach the geometry to merged_data_df
 # Since merged_data_df is no longer an sf object after the join, convert it back
 # Prepare a geometry column from pse_data_2023 matching Census_Tra in merged_data_df
@@ -74,22 +110,7 @@ GIS_EE_2023 <- merged_data_df %>%
 
 # View the final sf object
 head(GIS_EE_2023)
-
-
 ```
-
-
-This code filters pse_data for entries from the year 2023 and ensures that the identifiers (Census_Tra from pse_data_2023 and GEOID from equity_data) are of compatible data types for merging. It then converts both datasets to regular dataframes, explicitly removing the geometry column from equity_data to simplify the merge operation. 
-
-An inner_join is performed based on these identifiers, merging attributes from equity_data into pse_data_2023 where their identifiers match. Finally, the merged dataframe is converted back into an sf object by reattaching the geometry from pse_data_2023. 
-
-This process ensures a streamlined dataset that combines relevant attributes from both sources, based on the year 2023 and matching geographic identifiers, for detailed spatial analysis.
-
-
-```{r GIS 2023 - Clean Data}
-
-```
-
 
 
 ```{r GIS Equity Data}
