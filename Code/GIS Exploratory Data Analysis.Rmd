@@ -71,6 +71,8 @@ This process ensures a streamlined dataset that combines relevant attributes fro
 
 
 ```{r GIS 2023 - Clean Data}
+
+###cleaning the merged dataframe###
 #drop unnecessary columns from the equity data portion of the joined data set
 merged_data_df = subset(merged_data_df, select = c(OBJECTID_1, ID, CAL_YEAR, Cal_Qtr,Census_Tra, Sector, Grouped_Fl,Usage_MMBT, Number_Acc, Emissions_, USAGEPERCA, EMISSIONSP, RSE_Quinti, SHAPE_Leng.x, SHAPE_Area.x, COMPOSITE_,RACE_ELL_O,SOCIOECON_,HEALTH_DIS,SOCIOECO_2,SHAPE_Leng.y,SHAPE_Area.y, RACE_ELL_1,HEALTH_D_1,COMPOSIT_1, COMPOSIT_2,RACE_ELL_2,SOCIOECO_1,HEALTH_D_2))
 
@@ -87,13 +89,15 @@ sapply(merged_data_df, function(x) sum(is.na(x)))
 #making the QUINTILE labels uniform across the columns (Highest priority value differs)
 merged_data_df[merged_data_df == 'Highest Equity Priority' | merged_data_df == 'Highest Equity Priority/Most Disadvantaged' | merged_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
 
-#unique(merged_data_df$RACE_ELL_ORIGINS_QUINTILE)
-#unique(merged_data_df$SOCIOECON_DISADV_QUINTILE)
-#unique(merged_data_df$HEALTH_DISADV_QUINTILE)
-#unique(merged_data_df$COMPOSITE_QUINTILE)
-#unique(merged_data_df$RSE_Quintile)
+
+###cleaning the PSE dataframe###
+#removing null values from the Calendar Year column
+pse_tseries <- as.data.frame(pse_data)
+pse_tseries <- pse_tseries %>% drop_na(CAL_YEAR)
+sapply(pse_tseries, function(x) sum(is.na(x)))
+
 ```
-This code selects a subset of relevant columns from the merged dataframe to reduce the number of parameters and only ones that we are likely to use remain. Then, it renames the columns because the abbreviations were unclear about what data is contained in the column. It checked for missing values in the columns but there were none. Finally, it changes the Highest Priority level label to simply 'Highest' in the QUINTILE columns because they all had different values for it and this fits better into with the other labels that are also more simple, such as 'Lowest'. 
+This code selects a subset of relevant columns from the merged dataframe to reduce the number of parameters and only ones that we are likely to use remain. Then, it renames the columns because the abbreviations were unclear about what data is contained in the column. It checked for missing values in the columns but there were none. It also changes the Highest Priority level label to simply 'Highest' in the QUINTILE columns because they all had different values for it and this fits better into with the other labels that are also more simple, such as 'Lowest'. Finally, it removes null values from the initial pse_data dataset so that time series analysis can be performed. Missing values in the emission data columns was left because substituting with any number would skew results.
 
 ```{r Reattach the geometry to merged_data_df}
 # Step 5: Reattach the geometry to merged_data_df
