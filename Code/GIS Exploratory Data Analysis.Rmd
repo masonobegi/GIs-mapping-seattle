@@ -72,32 +72,44 @@ This process ensures a streamlined dataset that combines relevant attributes fro
 
 ```{r GIS 2023 - Clean Data}
 
-###cleaning the merged dataframe###
-#drop unnecessary columns from the equity data portion of the joined data set
-merged_data_df = subset(merged_data_df, select = c(OBJECTID_1, ID, CAL_YEAR, Cal_Qtr,Census_Tra, Sector, Grouped_Fl,Usage_MMBT, Number_Acc, Emissions_, USAGEPERCA, EMISSIONSP, RSE_Quinti, SHAPE_Leng.x, SHAPE_Area.x, COMPOSITE_,RACE_ELL_O,SOCIOECON_,HEALTH_DIS,SOCIOECO_2,SHAPE_Leng.y,SHAPE_Area.y, RACE_ELL_1,HEALTH_D_1,COMPOSIT_1, COMPOSIT_2,RACE_ELL_2,SOCIOECO_1,HEALTH_D_2))
+###cleaning the equity dataframe###
 
-head(merged_data_df)
+#create subset of relevant columns (ID, location, quintiles)
+equity_data_df = subset(equity_data_df, select = c(OBJECTID, GEOID, SHAPE_Leng, SHAPE_Area, RACE_ELL_1, SOCIOECO_2, HEALTH_D_1, COMPOSIT_1))
+#rename columns
+equity_data_df <- equity_data_df %>% rename(SHAPE_Length=SHAPE_Leng, RACE_ELL_ORIGINS_QUINTILE=RACE_ELL_1, SOCIOECON_DISADV_QUINTILE=SOCIOECO_2, HEALTH_DISADV_QUINTILE=HEALTH_D_1, COMPOSITE_QUINTILE=COMPOSIT_1)
+sapply(equity_data_df, function(x) sum(is.na(x)))
 
-#renaming columns to names in the data table to make it less confusing
-merged_data_df <- merged_data_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU=Usage_MMBT, Number_Accts=Number_Acc, Emissions_MTCO2E=Emissions_, USAGEPERCAPITA_MMBTU=USAGEPERCA, EMISSIONSPERCAPITA_MTCO2E=EMISSIONSP, RSE_Quintile=RSE_Quinti, SHAPE_Length.x=SHAPE_Leng.x, SHAPE_Length.y=SHAPE_Leng.y, COMPOSITE_PERCENTILE=COMPOSITE_, RACE_ELL_ORIGINS_QUINTILE=RACE_ELL_1, SOCIOECON_DISADV_QUINTILE=SOCIOECO_2, HEALTH_DISADV_QUINTILE=HEALTH_D_1, COMPOSITE_QUINTILE=COMPOSIT_1, COMPOSITE_SCORE=COMPOSIT_2, RACE_ELL_ORIGINS_SCORE=RACE_ELL_2, SOCIOECON_DISADV_SCORE= SOCIOECO_1, HEALTH_DISADV_SCORE=HEALTH_D_2, RACE_ELL_ORIGINS_PERCENTILE=RACE_ELL_O, SOCIOECON_DISADV_PERCENTILE=SOCIOECON_, HEALTH_DISADV_PERCENTILE=HEALTH_DIS)
-
-head(merged_data_df)
-
-sapply(merged_data_df, function(x) sum(is.na(x)))
-#there are no missing values
+#sapply(equity_data_df, function(x) sum(is.na(x)))
+#no null values
 
 #making the QUINTILE labels uniform across the columns (Highest priority value differs)
-merged_data_df[merged_data_df == 'Highest Equity Priority' | merged_data_df == 'Highest Equity Priority/Most Disadvantaged' | merged_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+equity_data_df[equity_data_df == 'Highest Equity Priority' | equity_data_df == 'Highest Equity Priority/Most Disadvantaged' | equity_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+
+head(equity_data_df)
 
 
 ###cleaning the PSE dataframe###
-#removing null values from the Calendar Year column
-pse_tseries <- as.data.frame(pse_data)
-pse_tseries <- pse_tseries %>% drop_na(CAL_YEAR)
-sapply(pse_tseries, function(x) sum(is.na(x)))
 
+pse_tseries_df <- as.data.frame(pse_data)
+
+#filter the Grouped_Flag to TRUE
+pse_tseries_df <- subset(pse_tseries_df,Grouped_Fl=='TRUE' )
+head(pse_tseries_df)
+
+#sapply(pse_tseries_df, function(x) sum(is.na(x)))
+#no null values
+
+#renaming columns
+pse_tseries_df <- pse_tseries_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU=Usage_MMBT, Number_Accts=Number_Acc, Emissions_MTCO2E=Emissions_, USAGEPERCAPITA_MMBTU=USAGEPERCA, EMISSIONSPERCAPITA_MTCO2E=EMISSIONSP, RSE_Quintile=RSE_Quinti, SHAPE_Length=SHAPE_Leng)
+
+#making the QUINTILE labels uniform with the equity data quintiles (Highest priority value differs)
+pse_tseries_df$RSE_Quintile<-replace(pse_tseries_df$RSE_Quintile, pse_tseries_df$RSE_Quintile == 'Highest priority/Most disadvantaged', 'Highest')
+
+head(pse_tseries_df)
 ```
-This code selects a subset of relevant columns from the merged dataframe to reduce the number of parameters and only ones that we are likely to use remain. Then, it renames the columns because the abbreviations were unclear about what data is contained in the column. It checked for missing values in the columns but there were none. It also changes the Highest Priority level label to simply 'Highest' in the QUINTILE columns because they all had different values for it and this fits better into with the other labels that are also more simple, such as 'Lowest'. Finally, it removes null values from the initial pse_data dataset so that time series analysis can be performed. Missing values in the emission data columns was left because substituting with any number would skew results.
+
+This code removes unnecessary columns from the equity_data_df then renames the remaining columns for clearer understanding of the data in the columns. It checkes for null values, of which there were none and modifies the quintile label for highest priority to fit in with the format of the other labels. It also filters the pse_tseries_df to only include rows that have TRUE values in the Grouped_Flag column, which removed all missing values in the dataframe. It also renames columns and the highest equity priority label similar to the equity_data_df.
 
 ```{r Reattach the geometry to merged_data_df}
 # Step 5: Reattach the geometry to merged_data_df
