@@ -1,0 +1,147 @@
+---
+title: "GIS Exploratory Data Analysis"
+author: "Group P4T2"
+date: "2024-02-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(sf)
+library(dplyr)
+library(tidyr)
+```
+
+# Data Data Cleaning for GIS Analysis
+
+```{r read data}
+
+# Read the PSE and Equity shape files
+pse_data <- st_read("../Data/PSE_Gas_Tracts_2.shp")
+equity_data <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
+
+```
+
+pse_data aggregates gas consumption data by sector, year (2020-2023), and census tract in Seattle. Equity_data integrates race, ethnicity, socioeconomic status, and health disadvantages in Seattle.
+
+Below we will create a single data frame that will include our energy data (pse_data) and be merged with the equity data (equity_data). 
+
+For equity_data we will merge on GEOID and pse_data will merge on Census_Tract. 
+
+```{r GIS - column names}
+# Get column names of pse_data and equity_data
+colnames(pse_data)
+colnames(equity_data)
+```
+
+
+```{r GIS - Prep data for merge}
+
+# Step 1: Filter the PSE data for the Grouped_Flag to TRUE
+pse_data_clean <- subset(pse_data, Grouped_Fl=='TRUE')
+
+# Step 2: Ensure the GEOID and Census_Tract columns are of the same type before merging
+pse_data_clean$Census_Tra <- as.character(pse_data_clean$Census_Tra)
+equity_data$GEOID <- as.character(equity_data$GEOID)
+
+# Step 3: Convert to regular dataframes for the merge operation, and drop geometry column from equity_data
+pse_data_df <- as.data.frame(pse_data_clean)
+equity_data_df <- as.data.frame(equity_data %>% st_set_geometry(NULL))
+
+```
+
+
+This code segment filters pse_data for entries where Grouped_Flag is set to TRUE and ensures that the identifiers (Census_Tract from pse_data and GEOID from equity_data) are of compatible data types for merging. It then converts both datasets to regular dataframes and explicitly removes the geometry column from equity_data, simplifying the merge operation.
+
+Note: In our dataset on utility energy consumption, focusing on entries with the 'grouped flag' set to true is essential. This flag indicates data aggregation across multiple census tracts to preserve privacy, reflecting broader trends without risking the identification of individual tracts. Entries with the 'grouped flag' set to false, representing unaggregated data for individual tracts, may have values of 0, signifying no or insufficient data for aggregation
+
+
+```{r GIS - Clean Energy Data}
+
+# Step 4: Renaming Columns for Clarity
+pse_data_df <- pse_data_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU=Usage_MMBT, Number_Accts=Number_Acc, Emissions_MTCO2E=Emissions_, USAGEPERCAPITA_MMBTU=USAGEPERCA, EMISSIONSPERCAPITA_MTCO2E=EMISSIONSP, RSE_Quintile=RSE_Quinti, SHAPE_Length=SHAPE_Leng)
+
+# Step 5: Checking for Null Values
+#sapply(pse_data_df, function(x) sum(is.na(x)))
+#no null values
+
+# Step 6: Standardizing Quintile Labels
+pse_data_df$RSE_Quintile<-replace(pse_data_df$RSE_Quintile, pse_data_df$RSE_Quintile == 'Highest priority/Most disadvantaged', 'Highest')
+
+# View the clean energy dataframe
+head(pse_data_df)
+
+```
+
+
+In our data cleaning process for the pse_data_df, we initiated by renaming columns to ensure clarity and consistency, making the dataset more intuitive for analysis. Subsequent steps included a comprehensive check for null values, confirming the dataset's completeness. Lastly, we standardized the quintile labels for the RSE_Quintile column, aligning them with uniform terminology. This standardization was crucial for comparative analysis, allowing for a seamless integration of data points across different metrics. 
+
+
+```{r GIS - Clean Equity Data}
+
+# Step 7: Creating a Subset of Relevant Columns (ID, location, quintiles)
+equity_data_df = subset(equity_data_df, select = c(OBJECTID, GEOID, SHAPE_Leng, SHAPE_Area, RACE_ELL_1, SOCIOECO_2, HEALTH_D_1, COMPOSIT_1))
+
+# Step 8: Renaming Columns for Clarity
+equity_data_df <- equity_data_df %>% rename(SHAPE_Length=SHAPE_Leng, RACE_ELL_ORIGINS_QUINTILE=RACE_ELL_1, SOCIOECON_DISADV_QUINTILE=SOCIOECO_2, HEALTH_DISADV_QUINTILE=HEALTH_D_1, COMPOSITE_QUINTILE=COMPOSIT_1)
+sapply(equity_data_df, function(x) sum(is.na(x)))
+
+# Step 9: Checking for Null Values
+#sapply(equity_data_df, function(x) sum(is.na(x)))
+#no null values
+
+# Step 10: Standardizing Quintile Labels
+equity_data_df[equity_data_df == 'Highest Equity Priority' | equity_data_df == 'Highest Equity Priority/Most Disadvantaged' | equity_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+
+# View the clean equity dataframe
+head(equity_data_df)
+
+```
+
+
+In our data cleaning process for the equity_data_df, we streamlined the dataset by selecting only essential columns related to ID, location, and quintile scores for various equity dimensions. We then renamed these columns for clarity. A thorough check for null values confirmed the dataset's completeness and reliability. Additionally, we standardized the labels for the highest quintile across all metrics to ensure consistency in our analysis. 
+
+
+```{r GIS - Reattach the geometry to merged_data_df}
+
+# Step 11: Merging the filtered 2023 PSE data with the equity data on GEOID/Census_Tract
+merged_data_df <- inner_join(pse_data_df, equity_data_df, by = c("Census_Tra" = "GEOID"))
+
+# View the merged dataframe
+head(merged_data_df)
+
+# Step 12: Reattach the geometry to merged_data_df
+# Since merged_data_df is no longer an sf object after the join, convert it back
+# Prepare a geometry column from pse_data_clean matching Census_Tra in merged_data_df
+geometry_col <- pse_data_clean %>% 
+  select(Census_Tra, geometry) %>% 
+  distinct(Census_Tra, .keep_all = TRUE)
+
+# Step 13: Join this geometry data back to the merged dataframe
+GIS_EE <- merged_data_df %>%
+  left_join(geometry_col, by = "Census_Tra") %>%
+  st_as_sf(crs = st_crs(pse_data_clean))
+
+# View the final sf object
+head(GIS_EE)
+
+```
+
+
+An inner_join is performed based on these identifiers, merging attributes from equity_data into pse_data_2023 where their identifiers match. Finally, after cleaning, the merged dataframe is converted back into an sf object by reattaching the geometry from pse_data_2023. 
+
+This process ensures a streamlined dataset that combines relevant attributes from both sources, based on the year 2023 and matching geographic identifiers, for detailed spatial analysis.
+
+
+```{r GIS - Initial Exploratory Graphs}
+
+
+```
+
+
+
+
+
