@@ -1,10 +1,6 @@
 # Team_8
 
-<<<<<<< HEAD
-# This is a test-LP
-=======
 # Seattle Building Energy Analysis
->>>>>>> a25a3277efd83fd8f6c10b77f06f119a3520ac87
 
 ## Project Overview
 
