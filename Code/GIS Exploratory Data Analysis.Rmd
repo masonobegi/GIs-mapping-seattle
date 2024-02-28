@@ -13,6 +13,8 @@ library(tidyverse)
 library(sf)
 library(dplyr)
 library(tidyr)
+library(spdep)
+library(leaflet)
 ```
 
 # Data Data Cleaning for GIS Analysis
@@ -138,10 +140,114 @@ This process ensures a streamlined dataset that combines relevant attributes fro
 
 ```{r GIS - Initial Exploratory Graphs}
 
+# Trend of emissions per capita over years
+ggplot(GIS_EE, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E, group = 1)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  labs(title = "Trend of Emissions Per Capita Over Years", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)")
+
+# Compare emissions per capita across sectors for each year
+ggplot(GIS_EE, aes(x = as.factor(CAL_YEAR), y = EMISSIONSPERCAPITA_MTCO2E, fill = Sector)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Sector-wise Emissions Per Capita Across Years", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom") 
+
+# Yearly trend in emissions per capita for each sector
+ggplot(GIS_EE, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_line(aes(color = Sector)) + 
+  geom_point(aes(color = Sector)) + 
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Yearly Trend of Emissions Per Capita by Sector", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(legend.position = "none") 
 
 ```
 
 
+Above, we explore emissions per capita (EMISSIONSPERCAPITA_MTCO2E) from 2020 to 2023 and compare it among various sectors (building types). The first graph is a line plot that allows us to observe trends over the years. We can see that the trend of emissions per capita is declining, which is a positive outcome. The second graph, a boxplot, compares the distributions across sectors for each year. This graph is challenging to read because industry buildings have a substantially higher range than commercial and residential buildings, which is not surprising but again makes the graph difficult to interpret. The third graph employs a facet wrap to visualize the yearly trend for each sector. These visualizations will help us understand how emissions per capita have changed over time and how these changes vary across different building sectors.
 
 
+```{r GIS - Boxplots for Each Sector}
+
+# Creating individual boxplots for each sector across years
+ggplot(GIS_EE, aes(x = as.factor(CAL_YEAR), y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_boxplot(aes(fill = Sector)) +
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Annual Emissions Per Capita by Sector", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+
+```
+
+
+In the revised graph, the boxplot has been reformatted to focus more closely on the sectors, allowing us to interpret the data for Commercial and Industrial building types more clearly. However, the Industrial sector still presents challenges in interpretation, aside from the evident potential outliers in some industrial buildings.
+
+
+```{r GIS - Industrial}
+
+# Filter the dataset for only the Industry sector
+industry_data <- subset(GIS_EE, Sector == "Industrial")
+
+summary(industry_data$EMISSIONSPERCAPITA_MTCO2E)  # Get a summary to see the range and quartiles
+
+# Creating a boxplot for the Industry sector
+ggplot(industry_data, aes(x = as.factor(CAL_YEAR), y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, 975)) + 
+  theme_minimal() +
+  labs(title = "Industry Sector: Annual Emissions Per Capita",
+       x = "Calendar Year",
+       y = "Emissions Per Capita (MTCO2E)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+Finally, this boxplot focuses exclusively on the industry sector, where clear outliers are evident. We will discuss how to proceed with the GIS group.
+
+
+```{r Basic Geographic Plot}
+
+# Basic Geographic Plot
+ggplot(data = GIS_EE) +
+  geom_sf(aes(color = EMISSIONSPERCAPITA_MTCO2E), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Emissions Per Capita",
+       color = "Emissions\nPer Capita (MTCO2E)") # 
+
+# Interactive Map
+leaflet(GIS_EE) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", EMISSIONSPERCAPITA_MTCO2E)(EMISSIONSPERCAPITA_MTCO2E),
+              fillOpacity = 0.5,
+              popup = ~paste("Emissions Per Capita:", EMISSIONSPERCAPITA_MTCO2E))
+
+```
+
+
+We aimed to generate geographic plots to visualize the distribution of our data points across Seattle. It appears that some energy data was omitted during the inner join. Below, we will graph the energy data before it was merged with the equity data. This omission could be due to mismatches between GEOID and Census Tract identifiers, raising questions about the extent of additional data available when examining only the energy data.
+
+
+```{r GIS - This is a test}
+
+ggplot(data = pse_data_clean) +
+  geom_sf(aes(color = EMISSIONSP), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Emissions Per Capita",
+       color = "Emissions\nPer Capita (MTCO2E)") # 
+
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", EMISSIONSP)(EMISSIONSP),
+              fillOpacity = 0.5,
+              popup = ~paste("Emissions Per Capita:", EMISSIONSP))
+
+```
+
+
+The geographic plot, utilizing energy data prior to merging with the equity data, reveals an increased number of data points. I plan to consult with the GIS team on the best path forward. My recommendation will likely involve dividing the analysis into two distinct sections for GIS: one focusing on examining energy data through an equity lens, and the other concentrating on analyzing energy usage across the Seattle area.
 
