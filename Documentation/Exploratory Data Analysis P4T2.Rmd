@@ -1,0 +1,126 @@
+---
+title: "Exploratory Data Analysis for Seattle Building Energy Analysis"
+author: "P4T2"
+date: "2024-03-05"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(sf)
+```
+
+# Introduction
+
+Briefly describe the project, objectives, and data sources.
+
+```{r read data}
+
+# Read the PSE and Equity shape files for GIS
+pse_data <- st_read("../Data/PSE_Gas_Tracts_2.shp")
+equity_data <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
+
+```
+
+# Data Cleaning
+
+```{r Identifying Missing Values}
+
+
+
+```
+
+Discuss your strategy for identifying and handling missing values.
+
+```{r Identifying Outliers}
+
+
+
+```
+
+Strategy and code for identifying and handling outliers.
+
+```{r Special Coding for Numerical Data (Binning, etc.)}
+
+
+
+```
+
+```{r Converting and Manipulating Character Data}
+
+
+
+```
+
+```{r Ensuring Data Integrity}
+
+
+
+```
+
+Discuss data integrity, type checking, format, bounds.
+
+```{r}
+
+```
+
+# Data Reshaping
+
+Discuss if and why your dataset needed reshaping.
+
+# Data Management
+
+Apply data management strategies, summarize key variables, and address outliers.
+
+In our project, we've implemented a streamlined collaborative workflow on GitLab, focusing on minimizing collaboration errors through effective data management strategies. Each team member initiates their work in a dedicated branch. This allows for isolated development without impacting the main codebase. Regular commits are made within these branches using `git add .` and `git commit -m "description"`.
+
+Before we start any work in our individual branch, first we update our branch with the main branch, using `git pull origin main`. This streamlines our development process, and also enforces a disciplined data management practice that minimizes errors and fosters efficient collaboration among team members.
+
+# Exploratory Data Analysis
+
+```{r Plot Distributions of Key Variables}
+
+
+
+```
+
+```{r Key Metrics/Measurements/Statistics}
+
+
+
+```
+
+```{r Analysis of Outliers/Anomalies}
+
+
+
+```
+
+```{r Deploying Graphical Tools}
+
+```
+
+```{r Analyzing Data Over Time}
+
+```
+
+```{r Comparison Across Categories}
+
+```
+
+```{r Pattern Identification and Interpretation}
+
+```
+
+# Discussion and Conclusions
+
+Summarize the key findings and outline any recommendations.
+
+# References
+
+List all data sources and other references used in your analysis.
