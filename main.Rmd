@@ -176,5 +176,4 @@ h. got it
 
 i. got it 
 
-j.
-
+j. As for right now there are no major correlations I am seeing escept for total GFA slowly going down over time. Speciifcally with a huge drop starting in 2020. There are only a few outliers. The data was cleaned cery well and there was no real challenge past that point to do data visualization.
