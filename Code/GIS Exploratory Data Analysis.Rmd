@@ -109,7 +109,7 @@ In our data cleaning process for the equity_data_df, we streamlined the dataset 
 
 ```{r GIS - Reattach the geometry to merged_data_df}
 
-# Step 11: Merging the filtered 2023 PSE data with the equity data on GEOID/Census_Tract
+# Merging the filtered 2023 PSE data with the equity data on GEOID/Census_Tract
 merged_data_df <- inner_join(pse_data_df, equity_data_df, by = c("Census_Tra" = "GEOID"))
 
 # View the merged dataframe
@@ -273,7 +273,6 @@ ggplot(GIS_EE_rem_outs, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E, group =
   theme_minimal() +
   labs(title = "Trend of Emissions Per Capita Over Years", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)")
 
-
 # Yearly trend in emissions per capita for each sector
 ggplot(GIS_EE_rem_outs, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E)) +
   geom_line(aes(color = Sector)) + 
@@ -282,6 +281,7 @@ ggplot(GIS_EE_rem_outs, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E)) +
   theme_minimal() +
   labs(title = "Yearly Trend of Emissions Per Capita by Sector", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
   theme(legend.position = "none") 
+
 ```
 ```{r geospatial emissions without outliers}
 
