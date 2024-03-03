@@ -1,0 +1,200 @@
+---
+title: "EDA for Mason's Forecasting"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-02-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#read in the data here for 2016-2022
+library(dplyr)
+data2022 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2022.csv")
+data2021 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2021.csv")
+data2020 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2020.csv")
+data2019 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2019.csv")
+data2018 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2018.csv")
+data2017 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2017.csv")
+data2016 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2016.csv")
+```
+
+
+```{r}
+#For 2017 specifically there are 2 columns that were giving us issues for data cleaning immediately.
+
+#Other than 2017 we are just omitting files that have na values
+data2017 <- select(data2017, -c(Low.Outlier.Cutoff, High.Outlier.Cutoff))
+data2022 <- na.omit(data2022)
+data2021 <- na.omit(data2021)
+data2020 <- na.omit(data2020)
+data2019 <- na.omit(data2019)
+data2018 <- na.omit(data2018)
+data2017 <- na.omit(data2017)
+data2016 <- na.omit(data2016)
+```
+
+
+```{r}
+#We are renaming all the columns names for all the years so they are all uniform so we can join them later. The order does not matter right now, we are going with the order of how they are in their respective files.
+
+colnames(data2016) <- c("BuildingType", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Number_of_Buildings", "Total_GFA", "Median_GFA", "Median_Year_Built", "Percent_Electricity", "Percent_Gas", "Percent_Steam", "Percent_Other_Fuel")
+
+colnames(data2017) <- c("BuildingType", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Number_of_Buildings", "Number_of_Buildings_with_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Percent_Electricity", "Percent_Gas", "Percent_Steam", "Percent_Other_Fuel")
+
+colnames(data2018) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_EUI", "Median_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Not applies")
+
+colnames(data2019) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2020) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2021) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2022) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+#we are doign 3 checks to see if every column in every year is in 2022, 2016 and 2018 respecitvely as I was having issues with incompatible dataset before
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2022)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2022)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2022)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2022)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2022)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2022)]
+
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2016)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2016)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2016)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2016)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2016)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2016)]
+data2022 <- data2022[, colnames(data2022) %in% colnames(data2016)]
+
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2018)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2018)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2018)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2018)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2018)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2018)]
+data2022 <- data2022[, colnames(data2022) %in% colnames(data2018)]
+
+#we are adding a year column to every dataset 
+library(dplyr)
+data2022 <- mutate(data2022, Year = 2022)
+data2021 <- mutate(data2021, Year = 2021)
+data2020 <- mutate(data2020, Year = 2020)
+data2019 <- mutate(data2019, Year = 2019)
+data2018 <- mutate(data2018, Year = 2018)
+data2017 <- mutate(data2017, Year = 2017)
+data2016 <- mutate(data2016, Year = 2016)
+```
+
+```{r}
+#we are now going to combine all our datasets
+combined_data <- bind_rows(
+  mutate(data2016, Year = 2016),
+  mutate(data2017, Year = 2017),
+  mutate(data2018, Year = 2018),
+  mutate(data2019, Year = 2019),
+  mutate(data2020, Year = 2020),
+  mutate(data2021, Year = 2021),
+  mutate(data2022, Year = 2022)
+)
+
+
+```
+
+```{r}
+
+#make distribution graphs for Total Gross Floor Area and median year built
+library(ggplot2)
+ggplot(combined_data, aes(x = Total_GFA)) +
+  geom_histogram(fill = "blue") +
+  labs(title = "Distribution of Total Gross Floor Area",
+       x = "Total Gross Floor Area",
+       y = "Frequency")
+
+ggplot(combined_data, aes(x = Median_Year_Built)) +
+  geom_histogram(fill = "blue") +
+  labs(title = "Distribution of Median Year Built",
+       x = "Median Year Built",
+       y = "Frequency")
+```
+
+
+```{r}
+#get the summary data and t tests for gross floor area and median es score
+print("Total Gross Floor Area")
+summary(combined_data$Total_GFA)
+gfa.p.val <- t.test(combined_data$Total_GFA)
+print(gfa.p.val)  
+  
+print("Median ES Score")
+summary(combined_data$Median_ES_Score)
+median_es.p.val <- t.test(combined_data$Median_ES_Score)
+print(median_es.p.val)  
+```
+```{r}
+ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
+  geom_point() +
+  labs(title = "Scatterplot between Median Year Built and Total_GFA",
+       x = "Median Year Built",
+       y = "Total_GFA")
+
+```
+
+
+```{r}
+#plot median year built vs median es score
+ggplot(combined_data, aes(x = Median_Year_Built, y = Median_EUI)) +
+  geom_point() +
+  labs(title = "Median_EUI and Median_Year_Built",
+       x = "Median Year Built",
+       y = "Median_EUI")
+
+```
+
+```{r}
+#plot the gross floor area over time
+ggplot(combined_data, aes(x = as.factor(Year), y = Median_EUI)) +
+  geom_line() +
+  labs(title = "Total Gross Floor Area Over Time",
+       x = "Year",
+       y = "Total Gross Floor Area")
+```
+
+```{r}
+#plot the total gross floor area by vuilding type
+ggplot(combined_data, aes(x = BuildingType, y = Total_GFA)) +
+  geom_boxplot() +
+  labs(title = "Total Gross Floor Area Across Building Types",
+       x = "Building Type",
+       y = "Total Gross Floor Area") +
+  theme(axis.text.x = element_text(angle = 90, size = 5)) 
+```
+
+Questions:
+a. 
+1. We are removing columns that have any NA values
+2. Outliers are fine, we do not need to worry about them, we do need to be aware of them but they are important to keep in
+3. No
+4. No
+5. We are good
+
+b. 
+1. No we do not need that
+2. Yes it does, we need to combine 7 datasets
+
+c. 
+1. got it
+
+d. got it
+e. got it
+f. We are not going to worry about the outliers for now. While we do have outliers they are not going to interfere with our data exploration for now as far as I can tell.
+h. got it
+
+i. got it 
+
+j. As for right now there are no major correlations I am seeing escept for Total Gross Floor Area slowly going down over time. Speciifcally with a huge drop starting in 2020. There are only a few outliers. The data was cleaned cery well and there was no real challenge past that point to do data visualization.
