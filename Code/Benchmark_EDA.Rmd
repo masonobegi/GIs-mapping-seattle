@@ -122,8 +122,20 @@ null_counts <- colSums(is.na(Bench2016_22))
 
 print(null_counts)
 ```
+```{r}
+Bench_cleaned = subset(Bench2016_22, select = -c(ListOfAllPropertyUseTypes, SecondLargestPropertyUseType, SecondLargestPropertyUseTypeGFA, ThirdLargestPropertyUseType, ThirdLargestPropertyUseTypeGFA, YearsENERGYSTARCertified, ENERGYSTARScore, SteamUse.kBtu., NaturalGas.therms., NaturalGas.kBtu.) )
+```
+Removed columns with too many NULL values to make the variable usable. 
 
-Remove columns with NULL values that make them unusable
+```{r}
+ncol(Bench_cleaned)
+colnames(Bench_cleaned)
+summary(Bench_cleaned)
+```
+```{r}
+write.csv(Bench_cleaned, "Bench_cleaned.csv", row.names = FALSE)
+```
+
 
 
 
