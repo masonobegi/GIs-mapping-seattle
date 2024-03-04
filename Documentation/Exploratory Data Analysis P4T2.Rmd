@@ -31,6 +31,17 @@ Briefly describe the project, objectives, and data sources. Test, Connor working
 pse_data <- st_read("../Data/PSE_Gas_Tracts_2.shp")
 equity_data <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
 
+
+#Read in building performance data
+library(dplyr)
+data2022 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2022.csv")
+data2021 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2021.csv")
+data2020 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2020.csv")
+data2019 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2019.csv")
+data2018 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2018.csv")
+data2017 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2017.csv")
+data2016 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2016.csv")
+
 ```
 
 # Data Cleaning
@@ -51,6 +62,8 @@ missing_summary_Equity <- equity_data %>%
   gather(key = "column", value = "missing_values")
 print(missing_summary_Equity)
 
+
+
 ```
 
 Discuss your strategy for identifying and handling missing values.
@@ -70,10 +83,23 @@ missing_summary_PSE_clean <- pse_data_clean %>%
   gather(key = "column", value = "missing_values")
 print(missing_summary_PSE_clean)
 
+#Building Performance Data
+#For 2017 specifically there are 2 columns that were giving us issues for data cleaning immediately.
+
+#Other than 2017 we are just omitting files that have na values
+data2017 <- select(data2017, -c(Low.Outlier.Cutoff, High.Outlier.Cutoff))
+data2022 <- na.omit(data2022)
+data2021 <- na.omit(data2021)
+data2020 <- na.omit(data2020)
+data2019 <- na.omit(data2019)
+data2018 <- na.omit(data2018)
+data2017 <- na.omit(data2017)
+data2016 <- na.omit(data2016)
+
 ```
 
 We no longer have any missing values in our PSE data.
-
+No more NA/missing values in Building Performance Data
 
 ```{r Converting and Manipulating Character Data, echo=FALSE}
 
@@ -119,7 +145,6 @@ equity_data_df <- equity_data_df %>%
 # Standardizing Quintile Labels in equity_data_df
 equity_data_df[equity_data_df == 'Highest Equity Priority' | equity_data_df == 'Highest Equity Priority/Most Disadvantaged' | equity_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
 
-
 ```
 
 
@@ -139,6 +164,69 @@ GIS_EE <- merged_data_df %>%
   left_join(geometry_col, by = "Census_Tra") %>%
   st_as_sf(crs = st_crs(pse_data_clean))
 
+
+#Building Performance Data
+
+#We are renaming all the columns names for all the years so they are all uniform so we can join them later. The order does not matter right now, we are going with the order of how they are in their respective files.
+
+colnames(data2016) <- c("BuildingType", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Number_of_Buildings", "Total_GFA", "Median_GFA", "Median_Year_Built", "Percent_Electricity", "Percent_Gas", "Percent_Steam", "Percent_Other_Fuel")
+
+colnames(data2017) <- c("BuildingType", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Number_of_Buildings", "Number_of_Buildings_with_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Percent_Electricity", "Percent_Gas", "Percent_Steam", "Percent_Other_Fuel")
+
+colnames(data2018) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_EUI", "Median_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Not applies")
+
+colnames(data2019) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2020) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2021) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2022) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+#we are doign 3 checks to see if every column in every year is in 2022, 2016 and 2018 respecitvely as I was having issues with incompatible dataset before
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2022)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2022)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2022)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2022)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2022)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2022)]
+
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2016)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2016)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2016)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2016)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2016)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2016)]
+data2022 <- data2022[, colnames(data2022) %in% colnames(data2016)]
+
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2018)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2018)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2018)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2018)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2018)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2018)]
+data2022 <- data2022[, colnames(data2022) %in% colnames(data2018)]
+
+#we are adding a year column to every dataset 
+library(dplyr)
+data2022 <- mutate(data2022, Year = 2022)
+data2021 <- mutate(data2021, Year = 2021)
+data2020 <- mutate(data2020, Year = 2020)
+data2019 <- mutate(data2019, Year = 2019)
+data2018 <- mutate(data2018, Year = 2018)
+data2017 <- mutate(data2017, Year = 2017)
+data2016 <- mutate(data2016, Year = 2016)
+
+#we are now going to combine all our datasets
+combined_data <- bind_rows(
+  mutate(data2016, Year = 2016),
+  mutate(data2017, Year = 2017),
+  mutate(data2018, Year = 2018),
+  mutate(data2019, Year = 2019),
+  mutate(data2020, Year = 2020),
+  mutate(data2021, Year = 2021),
+  mutate(data2022, Year = 2022)
+)
 
 ```
 
@@ -250,7 +338,7 @@ In our project, we've implemented a streamlined collaborative workflow on GitLab
 
 Before we start any work in our individual branch, first we update our branch with the main branch, using `git pull origin main`. This streamlines our development process, and also enforces a disciplined data management practice that minimizes errors and fosters efficient collaboration among team members.
 
-# Exploratory Data Analysis
+# GIS Exploratory Data Analysis
 
 In order to build a comprehensive GIS (Geographic Information System) analysis to visually represent energy usage patterns and emissions across different types of buildings in Seattle, we will use the following attributes below from our final merged data. 
 
@@ -428,6 +516,76 @@ leaflet(pse_data_clean) %>%
 
 
 The geographic plot, utilizing energy data prior to merging with the equity data, reveals an increased number of data points. We decided on the best path forward. We will divide the analysis into two distinct sections for GIS: one focusing on examining energy data through an equity lens, and the other concentrating on analyzing energy usage across the Seattle area.
+
+# Building Performance Data EDA
+
+```{r}
+#make distribution graphs for Total Gross Floor Area and median year built
+library(ggplot2)
+ggplot(combined_data, aes(x = Total_GFA)) +
+  geom_histogram(fill = "blue") +
+  labs(title = "Distribution of Total Gross Floor Area",
+       x = "Total Gross Floor Area",
+       y = "Frequency")
+
+ggplot(combined_data, aes(x = Median_Year_Built)) +
+  geom_histogram(fill = "blue") +
+  labs(title = "Distribution of Median Year Built",
+       x = "Median Year Built",
+       y = "Frequency")
+```
+
+
+```{r}
+#get the summary data and t tests for gross floor area and median es score
+print("Total Gross Floor Area")
+summary(combined_data$Total_GFA)
+gfa.p.val <- t.test(combined_data$Total_GFA)
+print(gfa.p.val)  
+  
+print("Median ES Score")
+summary(combined_data$Median_ES_Score)
+median_es.p.val <- t.test(combined_data$Median_ES_Score)
+print(median_es.p.val)  
+```
+
+
+```{r}
+ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
+  geom_point() +
+  labs(title = "Scatterplot between Median Year Built and Total_GFA",
+       x = "Median Year Built",
+       y = "Total_GFA")
+```
+
+
+```{r}
+#plot median year built vs median es score
+ggplot(combined_data, aes(x = Median_Year_Built, y = Median_EUI)) +
+  geom_point() +
+  labs(title = "Median_EUI and Median_Year_Built",
+       x = "Median Year Built",
+       y = "Median_EUI")
+```
+
+```{r}
+#plot the gross floor area over time
+ggplot(combined_data, aes(x = as.factor(Year), y = Median_EUI)) +
+  geom_line() +
+  labs(title = "Total Gross Floor Area Over Time",
+       x = "Year",
+       y = "Total Gross Floor Area")
+```
+
+```{r}
+#plot the total gross floor area by vuilding type
+ggplot(combined_data, aes(x = BuildingType, y = Total_GFA)) +
+  geom_boxplot() +
+  labs(title = "Total Gross Floor Area Across Building Types",
+       x = "Building Type",
+       y = "Total Gross Floor Area") +
+  theme(axis.text.x = element_text(angle = 90, size = 5)) 
+```
 
 # Conclusion
 

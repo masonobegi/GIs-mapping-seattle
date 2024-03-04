@@ -107,7 +107,6 @@ combined_data <- bind_rows(
 ```
 
 ```{r}
-
 #make distribution graphs for Total Gross Floor Area and median year built
 library(ggplot2)
 ggplot(combined_data, aes(x = Total_GFA)) +
@@ -136,13 +135,14 @@ summary(combined_data$Median_ES_Score)
 median_es.p.val <- t.test(combined_data$Median_ES_Score)
 print(median_es.p.val)  
 ```
+
+
 ```{r}
 ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
   geom_point() +
   labs(title = "Scatterplot between Median Year Built and Total_GFA",
        x = "Median Year Built",
        y = "Total_GFA")
-
 ```
 
 
@@ -153,7 +153,6 @@ ggplot(combined_data, aes(x = Median_Year_Built, y = Median_EUI)) +
   labs(title = "Median_EUI and Median_Year_Built",
        x = "Median Year Built",
        y = "Median_EUI")
-
 ```
 
 ```{r}
