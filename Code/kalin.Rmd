@@ -2,6 +2,9 @@
 title: EDA Summary
 output: html_notebook
 ---
+```{r}
+
+```
 
 Benchmarking2015 = read.csv("C:/Users/kalin/Downloads/Capstone_Building_data/2015_Building_Energy_Benchmarking.csv", header = TRUE)
 
