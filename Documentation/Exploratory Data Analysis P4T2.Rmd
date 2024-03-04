@@ -23,7 +23,7 @@ library(RColorBrewer)
 
 # Introduction
 
-Briefly describe the project, objectives, and data sources.
+Briefly describe the project, objectives, and data sources. Test, Connor working w git.
 
 ```{r read data, echo=FALSE}
 
