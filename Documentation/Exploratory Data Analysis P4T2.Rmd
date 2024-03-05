@@ -23,7 +23,11 @@ library(RColorBrewer)
 
 # Introduction
 
-Briefly describe the project, objectives, and data sources. Test, Connor working w git.
+In Seattle, buildings are one of the largest sources of climate pollution, responsible for more than a third of our city's Greenhouse Gas emissions, with over 90% of these emissions resulting from burning fossil fuels like fracked gas for heat, hot water, and appliances. These emissions pollute our air and accelerate climate change, which disproportionately harms Seattle's Black, Indigenous, and People of Color (BIPOC) communities. For our health and resilience in the face of a changing climate, Seattle is committed to eliminating climate pollution and transitioning to 100% clean energy in our buildings and vehicles by 2050. 
+
+To do this, Seattle must dramatically reduce fossil fuel use in buildings over the next decades. We must power more of our lives, homes, and buildings with cleaner energy -- constructing all-electric new buildings and retrofitting older buildings to phase out higher emissions fuels like gas and oil.
+
+# Read Data
 
 ```{r read data, echo=FALSE}
 
@@ -597,8 +601,15 @@ corrplot(cor, method = "number")
 
 # Conclusion
 
-Summarize the key findings and outline any recommendations.
+Using PSE usage as well as Racial and Social equity data, some things we hope to accomplish are determining correlation between high energy usage areas and low income communities. From there we may determine causation and possible solutions. 
+
+Using Building performance and energy benchmarking data, from here we hope to measure how successful the City of Seattle has been in achieving it's energy and pollution reduction goals. This includes the end goal of the City of Seattle being carbon neutral by 2050, across buildings, transportation, and
 
 # References
+PSE Usage Data and shape files:
+https://data-seattlecitygis.opendata.arcgis.com/datasets/SeattleCityGIS::pse-usage-data-for-ose-climate-portal/about
 
-List all data sources and other references used in your analysis.
+Racial and Social Equity Data and shape files:
+https://data-seattlecitygis.opendata.arcgis.com/datasets/SeattleCityGIS::racial-and-social-equity-composite-index-current/aboutv
+
+
