@@ -136,6 +136,17 @@ summary(combined_data$Median_ES_Score)
 median_es.p.val <- t.test(combined_data$Median_ES_Score)
 print(median_es.p.val)  
 ```
+
+```{r}
+#correlation matrix 
+
+cor_data <- select(combined_data, -c(BuildingType))
+cor <- cor(cor_data)
+round(cor,2)
+```
+
+
+
 ```{r}
 ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
   geom_point() +
