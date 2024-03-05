@@ -131,9 +131,29 @@ Removed columns with too many NULL values to make the variable usable.
 ncol(Bench_cleaned)
 colnames(Bench_cleaned)
 summary(Bench_cleaned)
+null_counts <- colSums(is.na(Bench_cleaned))
+null_counts
+mean(Bench_cleaned$PrimaryPropertyType)
 ```
+
 ```{r}
-write.csv(Bench_cleaned, "Bench_cleaned.csv", row.names = FALSE)
+
+Bench_cleaned = Bench_cleaned %>% mutate(NumberofBuildings = ifelse(is.null(NumberofBuildings), 1.122, NumberofBuildings))
+Bench_cleaned = Bench_cleaned %>% mutate(LargestPropertyUseTypeGFA = ifelse(is.null(LargestPropertyUseTypeGFA), 82861, LargestPropertyUseTypeGFA))
+Bench_cleaned = Bench_cleaned %>% mutate(SiteEUI.kBtu.sf. = ifelse(is.null(SiteEUI.kBtu.sf.), 53.61, SiteEUI.kBtu.sf.))
+Bench_cleaned = Bench_cleaned %>% mutate(SiteEUIWN.kBtu.sf. = ifelse(is.null(SiteEUIWN.kBtu.sf.), 54.20, SiteEUIWN.kBtu.sf.))
+Bench_cleaned = Bench_cleaned %>% mutate(SourceEUI.kBtu.sf. = ifelse(is.null(SourceEUI.kBtu.sf.), 125.1, SourceEUI.kBtu.sf.))
+Bench_cleaned = Bench_cleaned %>% mutate(SourceEUIWN.kBtu.sf. = ifelse(is.null(SourceEUIWN.kBtu.sf.), 125.9, SourceEUIWN.kBtu.sf.))
+Bench_cleaned = Bench_cleaned %>% mutate(SiteEnergyUse.kBtu. = ifelse(is.null(SiteEnergyUse.kBtu.), 5589121, SiteEnergyUse.kBtu.))
+Bench_cleaned = Bench_cleaned %>% mutate(SiteEnergyUseWN.kBtu. = ifelse(is.null(SiteEnergyUseWN.kBtu.), 5434499, SiteEnergyUseWN.kBtu.))
+Bench_cleaned = Bench_cleaned %>% mutate(Electricity.kWh. = ifelse(is.null(Electricity.kWh.), 1065563, Electricity.kWh.))
+Bench_cleaned = Bench_cleaned %>% mutate(Electricity.kBtu. = ifelse(is.null(Electricity.kBtu.), 3635701, Electricity.kBtu.))
+Bench_cleaned = Bench_cleaned %>% mutate(TotalGHGEmissions = ifelse(is.null(TotalGHGEmissions), 120.06, TotalGHGEmissions))
+Bench_cleaned = Bench_cleaned %>% mutate(GHGEmissionsIntensity = ifelse(is.null(GHGEmissionsIntensity), 1.111, GHGEmissionsIntensity))
+
+null_counts_new <- colSums(is.na(Bench_cleaned))
+null_counts_new
+
 ```
 
 
