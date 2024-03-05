@@ -3,8 +3,8 @@ title: "Exploratory Data Analysis for Seattle Building Energy Analysis"
 author: "P4T2"
 date: "2024-03-05"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
   word_document: default
 ---
 
@@ -585,14 +585,6 @@ ggplot(combined_data, aes(x = BuildingType, y = Total_GFA)) +
        x = "Building Type",
        y = "Total Gross Floor Area") +
   theme(axis.text.x = element_text(angle = 90, size = 5)) 
-```
-
-```{r}
-#correlation matrix 
-cor_data <- select(combined_data, -c(BuildingType))
-cor <- cor(cor_data)
-library(corrplot)
-corrplot(cor, method = "number")
 ```
 
 # Conclusion

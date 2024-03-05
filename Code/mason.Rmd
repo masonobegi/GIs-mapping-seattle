@@ -143,8 +143,8 @@ print(median_es.p.val)
 #correlation matrix 
 cor_data <- select(combined_data, -c(BuildingType))
 cor <- cor(cor_data)
-round(cor,2)
- 
+library(corrplot)
+corrplot(cor, method = "number")
 ```
 >>>>>>> workspace/masono
 
