@@ -3,13 +3,14 @@ title: "Exploratory Data Analysis for Seattle Building Energy Analysis"
 author: "P4T2"
 date: "2024-03-05"
 output:
+  html_document:
+    df_print: paged
   pdf_document: default
-  html_document: default
   word_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 library(tidyverse)
 library(sf)
 library(readr)
@@ -66,7 +67,6 @@ print(missing_summary_Equity)
 
 ```
 
-Discuss your strategy for identifying and handling missing values.
 
 There are no missing values in our equity data, but PSE data does have missing values. Reading the description of the PSE data, the missing atributes is due to 'grouped flag' not being filtered to true. This flag indicates data aggregation across multiple census tracts to preserve privacy, reflecting broader trends without risking the identification of individual tracts. Entries with the 'grouped flag' set to false may have values of 0, signifying no or insufficient data for aggregation. 
 
@@ -254,6 +254,7 @@ GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$SOCIOECON_
 
 ```
 
+Below, we identified outliers within the energy metrics from the merged dataset of Puget Sound Energy (PSE) and equity data. This step will help us uncover any significant deviations in energy consumption and efficiency, which will inform our understanding of disparitiess.
 
 ```{r Identifying Outliers}
 
@@ -326,12 +327,6 @@ Ensuring Spatial and Analytical Bounds: Our process included rigorous checks to 
 
 Data Merging and Integrity: The inner_join operation, based on matching identifiers between pse_data_df and equity_data_df, was performed to merge relevant attributes. This step was critical in combining datasets without compromising data integrity, avoiding the introduction of duplicate rows or inaccuracies. The conversion of the merged dataframe back into an sf object, ensured the dataset remained conducive to detailed spatial analysis.
 
-
-
-# Data Reshaping
-
-Discuss if and why your dataset needed reshaping (GIS did not reshape).
-
 # Data Management
 
 In our project, we've implemented a streamlined collaborative workflow on GitLab, focusing on minimizing collaboration errors through effective data management strategies. Each team member initiates their work in a dedicated branch. This allows for isolated development without impacting the main codebase. Regular commits are made within these branches using `git add .` and `git commit -m "description"`.
@@ -352,27 +347,85 @@ USAGEPERCAPITA_MMBTU (Gas Usage Per Account): By calculating gas usage per accou
 
 EMISSIONSPERCAPITA_MTCO2E (Emissions Per Account): Similar to USAGEPERCAPITA_MMBTU, analyzing emissions per account provides insights into the carbon footprint of energy consumption on a per-account basis. This can help target specific buildings or sectors for emission reduction initiatives.
 
+
+```{r Analyzing Data Over Time}
+
+# Function to create a ggplot for the trend of a given attribute over years
+plotTrendOverYears <- function(data, attribute, attributeName, title) {
+  ggplot(data, aes(x = CAL_YEAR, y = .data[[attribute]])) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(title = title, x = "Calendar Year", y = attributeName)
+}
+
+# Plotting the trends with renamed attributes
+plotTrendOverYears(GIS_EE_encoded, "Usage_MMBTU", "Gas Consumption (MMBTU)", "Trend of Gas Consumption Over Years")
+plotTrendOverYears(GIS_EE_encoded, "Number_Accts", "Number of Accounts", "Trend of Number of Accounts Over Years")
+plotTrendOverYears(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions (MTCO2E)", "Trend of Emissions Over Years")
+plotTrendOverYears(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita (MMBTU)", "Trend of Usage Per Capita Over Years")
+plotTrendOverYears(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita (MTCO2E)", "Trend of Emissions Per Capita Over Years")
+
+
+
+```
+
+We explore energy usage and emissions from 2020 to 2023 and compare it among various sectors (building types). 
+
+Trend of Gas Consumption Over Years: The scale is dominated by these outliers, which could mask underlying trends.
+
+Trend of Number of Accounts Over Years: The number of accounts appears to increase over time, with a particular spike noted in 2022 This could be due to an increase in the customer base or changes in data collection. However, a drop back to previous levels suggests a possible correction or a one-time event.
+
+Trend of Emissions Over Years: Similar to the gas consumption graph, also exhibit sharp peaks. This suggests that high gas consumption is directly linked to increased emissions, highlighting specific points in time where emissions reduction efforts might be focused.
+
+Trend of Usage Per Capita Over Years: The per capita usage shows that there may be fluctuations in usage efficiency or changes in the number of accounts relative to consumption. Such variations warrant a closer look to understand the driving factors behind the increased per capita consumption.
+
+Trend of Emissions Per Capita Over Years: Emissions per capita follows a similar pattern to the other metrics, with notable peaks that stand out. These could indicate years where emission reduction measures were less effective or where consumption was unusually high.
+
+We will take a closer look by analyzing the distribution of attributes for each sector individually. 
+
 ```{r Plot Distributions of Key Variables}
 
 # Function to create individual boxplots for a given attribute across years, for each sector
 createBoxplotsBySector <- function(data, attribute, title_suffix) {
+  # Determine the y-axis label based on the attribute
+  yAxisLabel <- switch(attribute,
+                       EMISSIONSPERCAPITA_MTCO2E = "Emissions Per Capita (MTCO2E)",
+                       Usage_MMBTU = "Gas Consumption (MMBTU)",
+                       Number_Accts = "Number of Accounts",
+                       Emissions_MTCO2E = "Emissions (MTCO2E)",
+                       USAGEPERCAPITA_MMBTU = "Usage Per Capita (MMBTU)")
+  
   ggplot(data, aes(x = as.factor(CAL_YEAR), y = .data[[attribute]])) +
     geom_boxplot(aes(fill = Sector)) +
-    facet_wrap(~Sector, scales = "free_y") + 
+    facet_wrap(~Sector, scales = "free_y") +
     theme_minimal() +
     labs(title = paste("Annual", title_suffix, "by Sector"),
-         x = "Calendar Year", y = paste(title_suffix, "(MTCO2E)")) +
+         x = "Calendar Year", y = yAxisLabel) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
 }
+
+# Adjust the function calls with the correct title suffixes
 createBoxplotsBySector(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita")
-createBoxplotsBySector(GIS_EE_encoded, "Usage_MMBTU", "Usage MMBTU")
+createBoxplotsBySector(GIS_EE_encoded, "Usage_MMBTU", "Gas Consumption")
 createBoxplotsBySector(GIS_EE_encoded, "Number_Accts", "Number of Accounts")
-createBoxplotsBySector(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions MTCO2E")
-createBoxplotsBySector(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita MMBTU")
+createBoxplotsBySector(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions")
+createBoxplotsBySector(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita")
 
 ```
 
-Above, is a boxplot that focus more closely on the sectors, allowing us to interpret the data for Commercial and Industrial building types more clearly. However, the Industrial sector still presents challenges in interpretation, aside from the evident potential outliers in some industrial buildings.
+Above, are boxplots that focus closely on the sectors, allowing us to interpret the data for Commercial, Industrial, and Residential building types. However, the Industrial sector still presents challenges in interpretation, aside from the evident potential outliers in some industrial buildings.
+
+Annual Usage Per Capita by Sector: For the commercial sector, the distribution of usage per capita is relatively consistent across the years. The industrial sector again stands out with significant outliers, indicating a few accounts with extremely high gas usage per capita. Residential usage per capita is lower, suggesting either higher energy efficiency or less intensive energy use in the residential sector.
+
+Annual Emissions by Sector: The commercial sector has a relatively stable range with some outliers. The industrial sector's emissions data feature a very low median and interquartile range with the presence of significant outliers, which highlights a few industrial facilities with exceptionally high emissions. The residential sector's emissions are more consistent, lacking any extreme outliers.
+
+Annual Number of Accounts by Sector: The commercial sector displays a steady number of accounts with little variation. In contrast, the industrial sector has a lower median value but a wide range of accounts, reflecting a diverse industrial base. The residential sector shows higher values, indicating a greater number of accounts, which is expected given the prevalence of residential buildings.
+
+Annual Emissions Per Capita by Sector: The commercial sector's emissions per capita are moderate but with several outliers indicating a few instances of disproportionately high emissions. The industrial sector's boxplots are compressed at the bottom of the scale, which alongside numerous extreme outliers, suggests a few highly emitting industrial operations relative to the number of accounts. The residential sector shows less variation in emissions per capita over the years and a relatively tighter interquartile range, indicating more uniformity in residential emissions.
+
+Annual Gas Consumption by Sector: The commercial sector shows a consistent range of consumption with some outliers suggesting occasional spikes in gas usage. The industrial sector exhibits a wide variance, indicating substantial differences in gas consumption patterns within this sector. Residential consumption appears to be lower and more consistent compared to the commercial sector. The industrial sector has extreme outliers that might warrant further investigation to understand the underlying causes of such high consumption values.
+
 
 ```{r Key Metrics/Measurements/Statistics}
 
@@ -397,55 +450,55 @@ for(sector in unique_sectors) {
 ```
 
 
-```{r Analyzing Data Over Time}
+The industrial sector stands out significantly due to its high mean and maximum values, indicating that a few industrial entities have substantially higher measurements than the rest, which could skew the sector's overall data profile. The commercial sector shows a more stable and predictable range of values with a distribution that is not heavily skewed by outliers. The residential sector shows the most consistency and uniformity in its values, suggesting similar energy profiles across different residential entities.
 
-# Function to create a ggplot for the trend of a given attribute over years
-plotTrendOverYears <- function(data, attribute, title) {
-  ggplot(data, aes_string(x = "CAL_YEAR", y = attribute, group = "1")) +
-    geom_line() +
-    geom_point() +
-    theme_minimal() +
-    labs(title = title, x = "Calendar Year", y = paste("Value (", attribute, ")"))
-}
-
-plotTrendOverYears(GIS_EE_encoded, "Usage_MMBTU", "Trend of Usage MMBTU Over Years")
-plotTrendOverYears(GIS_EE_encoded, "Number_Accts", "Trend of Number of Accounts Over Years")
-plotTrendOverYears(GIS_EE_encoded, "Emissions_MTCO2E", "Trend of Emissions MTCO2E Over Years")
-plotTrendOverYears(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Trend of Usage Per Capita MMBTU Over Years")
-plotTrendOverYears(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Trend of Emissions Per Capita MTCO2E Over Years")
-
-
-```
-
-
-We explore energy usage and emissions from 2020 to 2023 and compare it among various sectors (building types). The first graph is a line plot that allows us to observe trends over the years. We can see that the trend of emissions per capita is declining, which is a positive outcome. 
+The extreme values in the industrial sector requiere further investigation.
 
 
 ```{r Comparison Across Categories}
 
 # Function to create a ggplot for yearly trends of a given attribute, grouped by sector
-createYearlyTrendPlot <- function(data, attribute, title_prefix) {
+createYearlyTrendPlot <- function(data, attribute, attributeName, title_prefix) {
   ggplot(data) +
-    geom_line(aes_string(x = "CAL_YEAR", y = attribute, color = "Sector"), size = 1) +
-    geom_point(aes_string(x = "CAL_YEAR", y = attribute, color = "Sector")) +
+    geom_line(aes(x = CAL_YEAR, y = .data[[attribute]], color = Sector), size = 1) +
+    geom_point(aes(x = CAL_YEAR, y = .data[[attribute]], color = Sector)) +
     facet_wrap(~Sector, scales = "free_y") +
     theme_minimal() +
     labs(title = paste(title_prefix, "Yearly Trend by Sector"),
          x = "Calendar Year",
-         y = paste(attribute, "(MTCO2E)")) +
-    theme(legend.position = "none")
+         y = attributeName) +
+    theme(legend.position = "bottom")
 }
-createYearlyTrendPlot(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita")
-createYearlyTrendPlot(GIS_EE_encoded, "Usage_MMBTU", "Usage MMBTU")
-createYearlyTrendPlot(GIS_EE_encoded, "Number_Accts", "Number of Accounts")
-createYearlyTrendPlot(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions MTCO2E")
-createYearlyTrendPlot(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita MMBTU")
+
+# Plotting the trends with renamed attributes
+createYearlyTrendPlot(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita (MTCO2E)", "Emissions Per Capita")
+createYearlyTrendPlot(GIS_EE_encoded, "Usage_MMBTU", "Gas Consumption (MMBTU)", "Gas Consumption")
+createYearlyTrendPlot(GIS_EE_encoded, "Number_Accts", "Number of Accounts", "Number of Accounts")
+createYearlyTrendPlot(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions (MTCO2E)", "Emissions")
+createYearlyTrendPlot(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita (MMBTU)", "Usage Per Capita")
+
 
 ```
 
 Above, we employ a facet wrap to visualize the yearly trend for each sector. These visualizations will help us understand how energy usage and emissions have changed over time and how these changes vary across different building sectors.
 
-```{r Pattern Identification and Interpretation, leaflet-map, fig.cap="A Leaflet Map of Emissions", echo=FALSE}
+Emissions Per Capita Yearly Trend by Sector: Industrial emissions per capita have extreme values in some years, indicating significant variability within this sector. Both commercial and residential sectors show less variability but note that the scale differences across graphs may make comparisons challenging.
+
+Gas Consumption Yearly Trend by Sector: The industrial sector shows extreme gas consumption values, which could be due to large-scale industrial activities or data reporting errors. The commercial and residential sectors show a steady trend without such extremes.
+
+Number of Accounts Yearly Trend by Sector: The residential sector exhibits a spike in the number of accounts in one year, then a return to previous levels. The commercial and industrial sectors show less dramatic changes.
+
+Emissions Yearly Trend by Sector: Industrial emissions demonstrate extreme peaks, mirroring the trend in gas consumption and emissions per capita, suggesting that certain industrial activities are major contributors to overall emissions.
+Commercial and residential sectors show a more stable trend, but the residential sector shows some variability in recent years.
+
+Usage Per Capita Yearly Trend by Sector: The industrial sector's usage per capita also includes outliers, reflecting the extreme values in other metrics. The commercial sector shows an increasing trend in recent years, and the residential sector exhibits variability.
+
+Summary of all metrics: The commercial sector shows some outliers but generally has a more predictable range of values, suggesting that while there are peaks in consumption and emissions, they are not as pronounced as in the industrial sector.
+Residential metrics are generally more tightly grouped, indicating less variability between accounts in this sector.
+The presence of outliers in the industrial sector, may indicate potential targets for interventions to reduce consumption and emissions. These outliers requiere further investigation.
+
+
+```{r Pattern Identification and Interpretation, echo=FALSE}
 
 # Function to create an interactive map for a given data column
 createInteractiveMap <- function(data, column_name, colorPalette = "viridis", title = "") {
@@ -463,11 +516,11 @@ createInteractiveMap <- function(data, column_name, colorPalette = "viridis", ti
               labFormat = labelFormat(),
               opacity = 1)
 }
-createInteractiveMap(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "viridis", "Emissions Per Capita MTCO2E")
-createInteractiveMap(GIS_EE_encoded, "Usage_MMBTU", "viridis", "Usage MMBTU")
+createInteractiveMap(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "viridis", "Emissions Per Capita")
+createInteractiveMap(GIS_EE_encoded, "Usage_MMBTU", "viridis", "Gas Consumption")
 createInteractiveMap(GIS_EE_encoded, "Number_Accts", "viridis", "Number of Accounts")
-createInteractiveMap(GIS_EE_encoded, "Emissions_MTCO2E", "viridis", "Emissions MTCO2E")
-createInteractiveMap(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "viridis", "Usage Per Capita MMBTU")
+createInteractiveMap(GIS_EE_encoded, "Emissions_MTCO2E", "viridis", "Emissions from Gas usage")
+createInteractiveMap(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "viridis", "Gas Usage Per Capita")
 
 ```
 
@@ -475,49 +528,95 @@ createInteractiveMap(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "viridis", "Usage P
 We aimed to generate geographic plots to visualize the distribution of our data points across Seattle. It appears that some energy data was omitted during the inner join. Below, we will graph the energy data before it was merged with the equity data. This omission could be due to mismatches between GEOID and Census Tract identifiers, raising questions about the extent of additional data available when examining only the energy data.
 
 
-```{r Analysis of Outliers/Anomalies, leaflet-map, fig.cap="A Leaflet Map of Emissions", echo=FALSE}
+```{r Analysis of Outliers/Anomalies, echo=FALSE}
 
-# EMISSIONSPERCAPITA_MTCO2E
+# EMISSIONSP
 leaflet(pse_data_clean) %>%
   addTiles() %>%
-  addPolygons(color = ~colorNumeric("viridis", EMISSIONSP)(EMISSIONSP),
-              fillOpacity = 0.5,
-              popup = ~paste("Emissions Per Capita MTCO2E:", EMISSIONSP))
+  addPolygons(
+    color = ~colorNumeric("viridis", EMISSIONSP)(EMISSIONSP),
+    fillOpacity = 0.5,
+    popup = ~paste("Emissions Per Capita:", EMISSIONSP)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$EMISSIONSP), 
+    values = ~EMISSIONSP,
+    title = "Emissions Per Capita",
+    position = "bottomright"
+  )
 
-# Usage_MMBTU
+# Usage_MMBT
 leaflet(pse_data_clean) %>%
   addTiles() %>%
-  addPolygons(color = ~colorNumeric("viridis", Usage_MMBT)(Usage_MMBT),
-              fillOpacity = 0.5,
-              popup = ~paste("Usage MMBTU:", Usage_MMBT))
+  addPolygons(
+    color = ~colorNumeric("viridis", Usage_MMBT)(Usage_MMBT),
+    fillOpacity = 0.5,
+    popup = ~paste("Gas Consumption:", Usage_MMBT)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$Usage_MMBT), 
+    values = ~Usage_MMBT,
+    title = "Gas Consumption",
+    position = "bottomright"
+  )
 
 # Number_Accts
 leaflet(pse_data_clean) %>%
   addTiles() %>%
-  addPolygons(color = ~colorNumeric("viridis", Number_Acc)(Number_Acc),
-              fillOpacity = 0.5,
-              popup = ~paste("Number of Accounts:", Number_Acc))
+  addPolygons(
+    color = ~colorNumeric("viridis", Number_Acc)(Number_Acc),
+    fillOpacity = 0.5,
+    popup = ~paste("Number of Accounts:", Number_Acc)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$Number_Acc), 
+    values = ~Number_Acc,
+    title = "Number of Accounts",
+    position = "bottomright"
+  )
 
-# Emissions_MTCO2E
+# Emissions_
 leaflet(pse_data_clean) %>%
   addTiles() %>%
-  addPolygons(color = ~colorNumeric("viridis", Emissions_)(Emissions_),
-              fillOpacity = 0.5,
-              popup = ~paste("Emissions MTCO2E:", Emissions_))
+  addPolygons(
+    color = ~colorNumeric("viridis", Emissions_)(Emissions_),
+    fillOpacity = 0.5,
+    popup = ~paste("Emissions:", Emissions_)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$Emissions_), 
+    values = ~Emissions_,
+    title = "Emissions from Gas",
+    position = "bottomright"
+  )
 
-# USAGEPERCAPITA_MMBTU
+# USAGEPERCA
 leaflet(pse_data_clean) %>%
   addTiles() %>%
-  addPolygons(color = ~colorNumeric("viridis", USAGEPERCA)(USAGEPERCA),
-              fillOpacity = 0.5,
-              popup = ~paste("Usage Per Capita MMBTU:", USAGEPERCA))
+  addPolygons(
+    color = ~colorNumeric("viridis", USAGEPERCA)(USAGEPERCA),
+    fillOpacity = 0.5,
+    popup = ~paste("Gas Usage Per Capita:", USAGEPERCA)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$USAGEPERCA), 
+    values = ~USAGEPERCA,
+    title = "Gas Usage Per Capita",
+    position = "bottomright"
+  )
+
 
 ```
 
 
-The geographic plot, utilizing energy data prior to merging with the equity data, reveals an increased number of data points. We decided on the best path forward. We will divide the analysis into two distinct sections for GIS: one focusing on examining energy data through an equity lens, and the other concentrating on analyzing energy usage across the Seattle area.
+The geographic plot, utilizing energy data prior to merging with the equity data, reveals an increased number of data points. We decided on the best path forward, is to divide the analysis into two distinct sections for GIS: one focusing on examining energy data through an equity lens, and the other concentrating on analyzing energy usage across the Seattle area. 
+The equity analysis will target key metrics such as Gas Usage Per Account to analyze patterns of energy efficiency or lack thereof within residential sectors, helping to identify which neighborhoods, potentially characterized by low-income and BIPOC communities, exhibit higher energy usage. This effort seeks to validate our theory that disadvantaged neighborhoods may exhibit lower energy efficiency.
 
-# Building Performance Data EDA
+For the industrial sector, known for its significant variance, we will leverage spatial techniques alongside Principal Component Analysis (PCA) or Spatial Principal Component Analysis (SPCA). This approach will help us understand if outliers within the industrial data are meaningful, with the scores plot offering insights into potential outliers or natural sample groupings, thereby highlighting critical differences or similarities.
+
+The sector-specific analysis will also dissect energy usage across commercial and industrial realms, employing Gas Consumption as a principal metric to pinpoint high-energy consumption areas. Integrating an equity perspective with a sector specific analysis, will allow us to showcase a holistic energy consumption patterns across different sectors but also to bring to light any disparities in energy use efficiency that align with socioeconomic and demographic factors. 
+
+# Building Performance Exploratory Data Analysis
 
 ```{r}
 #make distribution graphs for Total Gross Floor Area and median year built
