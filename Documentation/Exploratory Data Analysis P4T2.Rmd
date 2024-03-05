@@ -3,8 +3,8 @@ title: "Exploratory Data Analysis for Seattle Building Energy Analysis"
 author: "P4T2"
 date: "2024-03-05"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
   word_document: default
 ---
 
