@@ -114,30 +114,19 @@ Bench2016_22 = rbind(Bench2016, Bench2022)
 ```
 
 ```{r}
-write.csv(Bench2016_22, "Bench2016_22.csv", row.names = FALSE)
-```
-
-```{r}
+#Looking for NULL values
 null_counts <- colSums(is.na(Bench2016_22))
 
 print(null_counts)
 ```
 ```{r}
+#Removed columns with too many NULL values to make the variable usable. 
 Bench_cleaned = subset(Bench2016_22, select = -c(ListOfAllPropertyUseTypes, SecondLargestPropertyUseType, SecondLargestPropertyUseTypeGFA, ThirdLargestPropertyUseType, ThirdLargestPropertyUseTypeGFA, YearsENERGYSTARCertified, ENERGYSTARScore, SteamUse.kBtu., NaturalGas.therms., NaturalGas.kBtu.) )
 ```
-Removed columns with too many NULL values to make the variable usable. 
+
 
 ```{r}
-ncol(Bench_cleaned)
-colnames(Bench_cleaned)
-summary(Bench_cleaned)
-null_counts <- colSums(is.na(Bench_cleaned))
-null_counts
-mean(Bench_cleaned$PrimaryPropertyType)
-```
-
-```{r}
-
+#Substituted NULL values with the column mean (for now)
 Bench_cleaned <- Bench_cleaned %>% mutate(NumberofBuildings = ifelse(is.na(NumberofBuildings), 1.122, NumberofBuildings))
 Bench_cleaned <- Bench_cleaned %>% mutate(LargestPropertyUseTypeGFA = ifelse(is.na(LargestPropertyUseTypeGFA), 82861, LargestPropertyUseTypeGFA))
 Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUI.kBtu.sf. = ifelse(is.na(SiteEUI.kBtu.sf.), 53.61, SiteEUI.kBtu.sf.))
@@ -156,6 +145,7 @@ null_counts_new
 
 ```
 ```{r}
+#Using summary to look for NULLs and outliers
 summary(Bench_cleaned)
 ```
 
@@ -187,6 +177,7 @@ boxplot(Bench_cleaned[, "GHGEmissionsIntensity"], col = "blue3", main = "Greenho
 ```
 
 ```{r}
+#Creating matrix to look for correlation
 Bench_numerical <- Bench_cleaned[, c("CouncilDistrictCode", "YearBuilt", "NumberofBuildings", 
                                    "NumberofFloors", "PropertyGFATotal", "PropertyGFAParking", 
                                    "PropertyGFABuilding.s.", "SiteEUI.kBtu.sf.", "SiteEUIWN.kBtu.sf.", 
@@ -194,13 +185,13 @@ Bench_numerical <- Bench_cleaned[, c("CouncilDistrictCode", "YearBuilt", "Number
                                    "SiteEnergyUseWN.kBtu.", "Electricity.kWh.", "Electricity.kBtu.", 
                                    "TotalGHGEmissions", "GHGEmissionsIntensity")]
 
-# Compute the correlation matrix
-correlation_matrix <- cor(Bench_numerical)
 
-# Print the correlation matrix
+correlation_matrix <- cor(Bench_numerical)
 print(correlation_matrix)
 ```
+
 ```{r}
+#Creating heatmap to visualize correlation
 correlation_matrix <- cor(Bench_numerical)
 
 heatmap(correlation_matrix, 
@@ -210,6 +201,31 @@ heatmap(correlation_matrix,
         main = "Correlation Heatmap of Quantfiable Variables")
 ```
 
+```{r}
+options(repr.plot.width=10, repr.plot.height=8)  # Adjust as needed
+
+
+par(mfrow = c(3, 3))  # Arrange plots in a 3x3 grid
+hist(Bench_cleaned$CouncilDistrictCode, main = "Council District Code", xlab = "District Code", col = "aquamarine")
+hist(Bench_cleaned$YearBuilt, main = "Year Built", xlab = "Year", col = "aquamarine")
+hist(Bench_cleaned$NumberofBuildings, main = "Number of Buildings", xlab = "Number of Buildings", col = "aquamarine")
+hist(Bench_cleaned$NumberofFloors, main = "Number of Floors", xlab = "Number of Floors", col = "aquamarine")
+hist(Bench_cleaned$PropertyGFATotal, main = "Property Gross Floor Area", xlab = "Area", col = "aquamarine")
+hist(Bench_cleaned$PropertyGFAParking, main = "Property GF Area for Parking", xlab = "Area", col = "aquamarine")
+hist(Bench_cleaned$PropertyGFABuilding.s., main = "Property GFA Building", xlab = "Area", col = "aquamarine")
+hist(Bench_cleaned$SiteEUI.kBtu.sf., main = "Site Energy Use Intensity", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SiteEUIWN.kBtu.sf., main = "Site Energy Use Intensity (WN)", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SourceEUI.kBtu.sf., main = "Source Energy Use Intensity", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SourceEUIWN.kBtu.sf., main = "Source Energy Use Intensity (WN)", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SiteEnergyUse.kBtu., main = "Site Energy Use", xlab = "Energy Use (kBtu)", col = "aquamarine")
+hist(Bench_cleaned$SiteEnergyUseWN.kBtu., main = "Site Energy Use (WN)", xlab = "Energy Use (kBtu)", col = "aquamarine")
+hist(Bench_cleaned$Electricity.kWh., main = "Electricity Use (kWh)", xlab = "Electricity Use (kWh)", col = "aquamarine")
+hist(Bench_cleaned$Electricity.kBtu., main = "Electricity Use (kBtu)", xlab = "Electricity Use (kBtu)", col = "aquamarine")
+hist(Bench_cleaned$TotalGHGEmissions, main = "Total GHG Emissions", xlab = "GHG Emissions", col = "aquamarine")
+hist(Bench_cleaned$GHGEmissionsIntensity, main = "GHG Emissions Intensity", xlab = "Intensity", col = "aquamarine")
+
+par(mfrow = c(1, 1))
+```
 
 
 
