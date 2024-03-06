@@ -102,6 +102,8 @@ data2016 <- na.omit(data2016)
 
 ```
 
+When using na.omit, it removes every row that has an NA value. The 2017 data is the only data set that has the Low/High Outlier cutoff columns, and for those columns almost every single row has an NA value. Therefore, we would have been only left with 3 rows for the whole 2017 dataset. Because of that, we deemed these columns unnecessary and removed them from the 2017 dataset. Omitting NA values allows for cleaner exploratory data analysis now even though we may revisit with these rows in the future.
+
 We no longer have any missing values in our PSE data.
 No more NA/missing values in Building Performance Data
 
@@ -232,9 +234,10 @@ combined_data <- bind_rows(
   mutate(data2022, Year = 2022)
 )
 
+combined_data<- combined_data[combined_data$BuildingType != "Citywide", ]
 ```
 
-
+We are renaming columns so they are all a unifrom name. THen we are checking to see if all columsn fit in the specific years (2022, 2016, 2018) to make sure all our data is uniform. We are then adding a year column and combining the data based on the rows. Then after that we are omitting the Citywide data because it is a majot outlier an dnot a building type we are interested in.
 
 ```{r Special Coding for Numerical Data (Binning, etc.), echo=FALSE}
 
@@ -627,20 +630,24 @@ The sector-specific analysis will also dissect energy usage across commercial an
 library(ggplot2)
 ggplot(combined_data, aes(x = Total_GFA)) +
   geom_histogram(fill = "blue") +
-  labs(title = "Distribution of Total Gross Floor Area",
+  labs(title = "Distribution of Total Gross Floor Area 2016-2022",
        x = "Total Gross Floor Area",
        y = "Frequency")
 
 ggplot(combined_data, aes(x = Median_Year_Built)) +
   geom_histogram(fill = "blue") +
-  labs(title = "Distribution of Median Year Built",
+  labs(title = "Distribution of Median Year Built 2016-2022",
        x = "Median Year Built",
        y = "Frequency")
 ```
 
+Gross Floor Area: Total space inside a building measured in square feet, also measured across all floors of a building
+
+Distribution of Gross Floor Area: The x-axis is in tens of millions. The highest values in this graph are office buildings and mid rise multi-family buildings (apartments)
+
+Distribution of Median Year Built: Seattle is a relatively old city, the newest buildings are built in 2005. This means that most buildings would be built before energy consumption was a public concern
 
 ```{r}
-#get the summary data and t tests for gross floor area and median es score
 print("Total Gross Floor Area")
 summary(combined_data$Total_GFA)
 gfa.p.val <- t.test(combined_data$Total_GFA)
@@ -652,36 +659,46 @@ median_es.p.val <- t.test(combined_data$Median_ES_Score)
 print(median_es.p.val)  
 ```
 
+Get the summary data and t-tests for gross floor area and median Energy star score
+Energy Star score is a comprehensive snapshot of the buildings energy performance,the score is 1-100 and assesses how your building is performing as a whole, taking into account its physical attributes, its operations, and how the people inside use it
+P-value being extremely small shows that the median ES score and the total GFA are not varying wildly
 
 ```{r}
 ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
   geom_point() +
-  labs(title = "Scatterplot between Median Year Built and Total_GFA",
+  labs(title = "Scatterplot between Median Year Built and Total Gross Floor Area",
        x = "Median Year Built",
        y = "Total_GFA")
 ```
 
+Wanted to test the theory that buildings get bigger as time goes on. Can see a positive correlation especially for the biggest buildings for each time period/year. 
 
 ```{r}
-#plot median year built vs median es score
+#plot median year built vs median EUI
 ggplot(combined_data, aes(x = Median_Year_Built, y = Median_EUI)) +
   geom_point() +
-  labs(title = "Median_EUI and Median_Year_Built",
+  labs(title = "Median Energy Use Intensity and Median Year Built",
        x = "Median Year Built",
        y = "Median_EUI")
 ```
 
-```{r}
-#plot the gross floor area over time
-ggplot(combined_data, aes(x = as.factor(Year), y = Median_EUI)) +
-  geom_line() +
-  labs(title = "Total Gross Floor Area Over Time",
-       x = "Year",
-       y = "Total Gross Floor Area")
-```
+Energy Use Intensity (EUI): Measure of a buildings energy consumption per unit of floor area
+Wanting to see how efficiently buildings are using their energy by build year
+
 
 ```{r}
-#plot the total gross floor area by vuilding type
+#plot EUI over time
+ggplot(combined_data, aes(x = as.factor(Year), y = Median_EUI)) +
+  geom_line() +
+  labs(title = "Highest Median EUI per year",
+       x = "Year",
+       y = "Median EUI")
+```
+
+Looking to see highest EUI per year. Highest EUI's belong supermarkets and hospitals which would make sense that there is a dip at 2020 during the pandemic
+
+```{r}
+#plot the total gross floor area by building type
 ggplot(combined_data, aes(x = BuildingType, y = Total_GFA)) +
   geom_boxplot() +
   labs(title = "Total Gross Floor Area Across Building Types",
@@ -689,6 +706,8 @@ ggplot(combined_data, aes(x = BuildingType, y = Total_GFA)) +
        y = "Total Gross Floor Area") +
   theme(axis.text.x = element_text(angle = 90, size = 5)) 
 ```
+
+Visually showing what total GFA looks like for each different type of building in our dataset and which types of buildings are typically bigger than others. Y axis is GFA in tens of millions.
 
 ```{r}
 #correlation matrix 
@@ -698,11 +717,13 @@ library(corrplot)
 corrplot(cor, method = "number")
 ```
 
+Quick correlation matrix to see which columns can be correlated. EUI scores are obviously highest while total GFA and number of buildings is also well correlated
+
 # Conclusion
 
 Using PSE usage as well as Racial and Social equity data, some things we hope to accomplish are determining correlation between high energy usage areas and low income communities. From there we may determine causation and possible solutions. 
 
-Using Building performance and energy benchmarking data, from here we hope to measure how successful the City of Seattle has been in achieving it's energy and pollution reduction goals. This includes the end goal of the City of Seattle being carbon neutral by 2050, across buildings, transportation, and
+Using Building performance and energy benchmarking data, from here we hope to measure how successful the City of Seattle has been in achieving it's energy and pollution reduction goals. This includes the end goal of the City of Seattle being carbon neutral by 2050.
 
 # References
 PSE Usage Data and shape files:
@@ -711,4 +732,5 @@ https://data-seattlecitygis.opendata.arcgis.com/datasets/SeattleCityGIS::pse-usa
 Racial and Social Equity Data and shape files:
 https://data-seattlecitygis.opendata.arcgis.com/datasets/SeattleCityGIS::racial-and-social-equity-composite-index-current/aboutv
 
-
+Building Performance Data and Energy Benchmarking Data:
+https://www.seattle.gov/environment/climate-change/buildings-and-energy/energy-benchmarking/data-and-reports#summaryinformationbybuildingtype
