@@ -21,6 +21,7 @@ library(spdep)
 library(leaflet)
 library(RColorBrewer)
 library(corrplot)
+library(spdep)
 library(scales)
 ```
 
@@ -1062,6 +1063,222 @@ ggplot() +
 
 
 
+```{r Morgan test - PSE}
+
+# Get unique values from the 'RSE_Quinti' column
+colname_test <- unique(GIS_EE_encoded$Sector)
+
+# Output the unique values
+print(colname_test)
+
+# Sector, Usage_MMBTU, Number_Accts, Emissions_MTCO2E, USAGEPERCAPITA_MMBTU, EMISSIONSPERCAPITA_MTCO2E, COMPOSITE_QUINTILE
+
+```
+
+
+
+
+
+
+
+```{r Morgan test - PSE}
+
+# Create neighbors and weights
+neighbors <- poly2nb(pse_data_clean)
+weights <- nb2listw(neighbors, style="W", zero.policy=TRUE)
+
+# Moran's I test for Emissions_
+moran_Emissions <- moran.test(pse_data_clean$Emissions_, weights)
+
+# Moran's I test for Usage_MMBT
+moran_Usage_MMBT <- moran.test(pse_data_clean$Usage_MMBT, weights)
+
+# Moran's I test for Number_Acc
+moran_Number_Acc <- moran.test(pse_data_clean$Number_Acc, weights)
+
+# Moran's I test for USAGEPERCA
+moran_USAGEPERCA <- moran.test(pse_data_clean$USAGEPERCA, weights)
+
+# Moran's I test for EMISSIONSP
+moran_EMISSIONSP <- moran.test(pse_data_clean$EMISSIONSP, weights)
+
+# For RSE_Quintile, ensure it's a numeric variable since Moran's I requires numeric inputs
+pse_data_clean$RSE_Quintile_numeric <- as.numeric(factor(pse_data_clean$RSE_Quinti, levels = c("Lowest", "Second lowest", "Middle", "Second highest", "Highest priority/Most disadvantaged")))
+moran_RSE_Quintile <- moran.test(pse_data_clean$RSE_Quintile_numeric, weights)
+
+# Encode the 'Sector' variable into an ordered numeric factor if there is a logical order
+pse_data_clean$Sector_numeric <- as.numeric(factor(pse_data_clean$Sector, 
+                                                   levels = c("Commercial", "Industrial", "Residential")))
+
+# Perform Moran's I test for the numerically encoded 'Sector'
+moran_Sector <- moran.test(pse_data_clean$Sector_numeric, weights)
+
+# Print the results
+print(moran_USAGEPERCA)
+print(moran_EMISSIONSP)
+print(moran_RSE_Quintile)
+print(moran_Number_Acc)
+print(moran_Emissions)
+print(moran_Usage_MMBT)
+print(moran_RSE_Quintile)
+print(moran_Sector)
+
+```
+
+High Moran's I statistics across various variables, indicating strong positive spatial autocorrelation.
+Particularly high values for "USAGEPERCA" and "EMISSIONSP," suggesting these aspects of energy data are highly clustered spatially.
+
+
+
+```{r Morgan test - RSE}
+
+# Define the order of the equity levels from lowest to highest equity priority
+levels_order <- c("Lowest", "Second Lowest", "Middle", "Second Highest", "Highest Equity Priority")
+
+# Convert 'COMPOSIT_1' to a factor with levels in the order specified above
+equity_data$COMPOSIT_1 <- factor(equity_data$COMPOSIT_1, levels = levels_order)
+
+# Convert the factor to numeric
+equity_data$COMPOSIT_1_numeric <- as.numeric(equity_data$COMPOSIT_1)
+
+# Prepare the neighbors and weights
+neighbors_equity <- poly2nb(equity_data)
+weights_equity <- nb2listw(neighbors_equity, style="W", zero.policy=TRUE)
+
+# Perform Moran's I test for the numerically encoded 'COMPOSIT_1'
+moran_COMPOSIT_1 <- moran.test(equity_data$COMPOSIT_1_numeric, weights_equity)
+
+# Print the results
+print(moran_COMPOSIT_1)
+
+
+
+```
+
+The Moran's I statistic for "COMPOSIT_1_numeric" also indicates strong positive spatial autocorrelation, though the value is lower compared to some of the energy variables.
+
+
+```{r Morgan test - merged data}
+
+# Convert 'Sector' to a numeric factor
+if(!is.numeric(GIS_EE_encoded$Sector)) {
+  GIS_EE_encoded$Sector_numeric <- as.numeric(factor(GIS_EE_encoded$Sector, 
+                                                     levels = c("Commercial", "Industrial", "Residential")))
+} else {
+  GIS_EE_encoded$Sector_numeric <- GIS_EE_encoded$Sector
+}
+
+# Prepare the neighbors and weights
+neighbors_merged <- poly2nb(GIS_EE_encoded)
+weights_merged <- nb2listw(neighbors_merged, style="W", zero.policy=TRUE)
+
+# Perform Moran's I test for each column
+moran_results <- list()
+
+# Perform Moran's I test for the 'Sector_numeric'
+moran_results$Sector <- moran.test(GIS_EE_encoded$Sector_numeric, weights_merged)
+
+# Perform Moran's I test for 'Usage_MMBTU'
+moran_results$Usage_MMBTU <- moran.test(GIS_EE_encoded$Usage_MMBTU, weights_merged)
+
+# Perform Moran's I test for 'Number_Accts'
+moran_results$Number_Accts <- moran.test(GIS_EE_encoded$Number_Accts, weights_merged)
+
+# Perform Moran's I test for 'Emissions_MTCO2E'
+moran_results$Emissions_MTCO2E <- moran.test(GIS_EE_encoded$Emissions_MTCO2E, weights_merged)
+
+# Perform Moran's I test for 'USAGEPERCAPITA_MMBTU'
+moran_results$USAGEPERCAPITA_MMBTU <- moran.test(GIS_EE_encoded$USAGEPERCAPITA_MMBTU, weights_merged)
+
+# Perform Moran's I test for 'EMISSIONSPERCAPITA_MTCO2E'
+moran_results$EMISSIONSPERCAPITA_MTCO2E <- moran.test(GIS_EE_encoded$EMISSIONSPERCAPITA_MTCO2E, weights_merged)
+
+# Perform Moran's I test for 'COMPOSITE_QUINTILE'
+moran_results$COMPOSITE_QUINTILE <- moran.test(GIS_EE_encoded$COMPOSITE_QUINTILE, weights_merged)
+
+# Print the results
+print(moran_results)
+
+
+```
+
+
+Moran's I statistics in the merged dataset for variables like "Sector_numeric" and "COMPOSITE_QUINTILE" remain high, suggesting continued strong positive spatial autocorrelation. However, the Moran's I statistics for "Usage_MMBTU" and "Emissions_MTCO2E" are notably lower than their counterparts in the energy data, indicating less spatial clustering in the merged data.
+
+
+
+```{r Building Performance Analysis - regroup building types}
+
+# Display unique building types
+unique_building_types <- unique(combined_data$BuildingType)
+print(unique_building_types)
+
+# Define a new column for the grouped building types
+combined_data$GroupedBuildingType <- combined_data$BuildingType
+
+# Replace similar building types with a standardized name
+combined_data$GroupedBuildingType <- gsub("High-Rise Multifamily|High-rise Multifamily", "High-rise Multifamily", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Mid-Rise Multifamily|Mid-rise Multifamily", "Mid-rise Multifamily", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Low-Rise Multifamily|Low-rise Multifamily", "Low-rise Multifamily", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Small- and Mid-Sized Office|Small/Mid-size Office", "Small and Mid-size Office", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Supermarket / Grocery Store|Supermarket/Grocery Store", "Supermarket/Grocery Store", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Hospital \\(General Medical & Surgical\\)|Hospital", "Hospital", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Residence Hall/Dormitory|Residence Hall", "Residence Hall/Dormitory", combined_data$GroupedBuildingType)
+
+# Check the new unique grouped building types
+unique_grouped_building_types <- unique(combined_data$GroupedBuildingType)
+print(unique_grouped_building_types)
+
+
+
+```
+
+
+```{r quick EDA}
+
+# Assuming cor_matrix is already computed
+cor_matrix <- cor(combined_data[, 2:9])
+
+# Find correlations greater than 0.6, excluding the diagonal
+high_cor_matrix <- cor_matrix > 0.6
+diag(high_cor_matrix) <- FALSE
+
+# Initialize an empty data frame to store results
+significant_correlations <- data.frame(
+  Var1 = character(),
+  Var2 = character(),
+  Correlation = numeric(),
+  P_Value = numeric()
+)
+
+# Loop through the high_cor_matrix to calculate and check significance
+for (i in seq_len(nrow(high_cor_matrix))) {
+  for (j in seq_len(ncol(high_cor_matrix))) {
+    if (high_cor_matrix[i, j]) {
+      test_result <- cor.test(combined_data[, i + 1], combined_data[, j + 1])
+      if (test_result$p.value < 0.05) {
+        # Add to results if significant
+        significant_correlations <- rbind(significant_correlations, data.frame(
+          Var1 = colnames(combined_data)[i + 1],
+          Var2 = colnames(combined_data)[j + 1],
+          Correlation = cor_matrix[i, j],
+          P_Value = test_result$p.value
+        ))
+      }
+    }
+  }
+}
+
+# Print significant correlations with their p-values
+if (nrow(significant_correlations) > 0) {
+  print("Significant correlations (p < 0.05):")
+  print(significant_correlations)
+} else {
+  print("No significant correlations above 0.6 were found.")
+}
+
+
+```
 
 
 
@@ -1070,6 +1287,278 @@ ggplot() +
 
 
 
+```{r High-Impact Building Types}
+
+# Calculate summary statistics for each grouped building type
+library(dplyr)
+
+eui_summary_grouped <- combined_data %>%
+  group_by(GroupedBuildingType) %>%
+  summarise(
+    Count = n(),
+    Mean_EUI = mean(Median_EUI, na.rm = TRUE),
+    SD_EUI = sd(Median_EUI, na.rm = TRUE),
+    Median_EUI = median(Median_EUI, na.rm = TRUE),
+    Percentile_75th_EUI = quantile(Median_EUI, 0.75, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(Median_EUI))
+
+# Filter for high-impact buildings based on the top quartile of Median EUI
+top_quartile_threshold_grouped <- quantile(eui_summary_grouped$Median_EUI, 0.75)
+high_impact_buildings_grouped <- eui_summary_grouped %>%
+  filter(Median_EUI >= top_quartile_threshold_grouped)
+
+# View the high-impact grouped building types
+print(high_impact_buildings_grouped)
+
+# Enhanced bar chart of the Median EUI for high-impact building types
+ggplot(high_impact_buildings_grouped, aes(x = reorder(GroupedBuildingType, -Median_EUI), y = Median_EUI)) +
+  geom_bar(stat = "identity", fill = "dodgerblue3") +
+  labs(
+    x = NULL,
+    y = "Median EUI",
+    title = "High-Impact Building Types Based on Median EUI",
+    subtitle = "EUI: Energy use intensity measured per unit of floor area",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    plot.caption = element_text(hjust = 0.5, size = 8)
+  ) +
+  scale_y_continuous(labels = scales::comma) # This will add commas to y-axis labels for readability
+
+
+
+```
+
+
+
+
+```{r Building Energy Benchmarking}
+
+
+# Display unique building and property types
+unique_building_types <- unique(Bench_cleaned$BuildingType)
+unique_property_types <- unique(Bench_cleaned$PrimaryPropertyType)
+
+# Create a new column for the grouped building types
+Bench_cleaned$GroupedBuildingType <- Bench_cleaned$BuildingType
+
+# Apply grouping rules for BuildingType
+Bench_cleaned$GroupedBuildingType <- ifelse(grepl("Nonresidential", Bench_cleaned$BuildingType, ignore.case = TRUE), 
+                                            "Nonresidential", 
+                                            Bench_cleaned$GroupedBuildingType)
+
+Bench_cleaned$GroupedBuildingType <- ifelse(grepl("Multifamily", Bench_cleaned$BuildingType), 
+                                            "Multifamily", 
+                                            Bench_cleaned$GroupedBuildingType)
+
+# Assuming "Campus" includes various educational facilities and "SPS-District K-12" is for K-12 schools
+Bench_cleaned$GroupedBuildingType <- ifelse(grepl("SPS-District K-12", Bench_cleaned$BuildingType) | 
+                                            grepl("Campus", Bench_cleaned$BuildingType), 
+                                            "Educational", 
+                                            Bench_cleaned$GroupedBuildingType)
+
+# Check the new unique grouped building types
+unique_grouped_building_types <- unique(Bench_cleaned$GroupedBuildingType)
+print(unique_grouped_building_types)
+
+
+# Assuming Bench_cleaned is your dataset
+
+# Create a new column for the grouped property types
+Bench_cleaned$GroupedPrimaryPropertyType <- Bench_cleaned$PrimaryPropertyType
+
+# Apply grouping rules for PrimaryPropertyType
+multifamily_types <- c("Mid-Rise Multifamily", "Low-Rise Multifamily", "High-Rise Multifamily",
+                       "Multifamily MR (5-9)", "Multifamily LR (1-4)", "Multifamily HR (10+)")
+office_types <- c("Small- and Mid-Sized Office", "Large Office", "Office")
+hospital_types <- c("Hospital", "Hospital (General Medical & Surgical)", "Other/Specialty Hospital")
+residence_types <- c("Residence Hall", "Residence Hall/Dormitory", "Other - Lodging/Residential")
+warehouse_types <- c("Warehouse", "Non-Refrigerated Warehouse", "Refrigerated Warehouse")
+retail_types <- c("Retail Store", "Other - Mall", "Enclosed Mall", "Strip Mall", "Wholesale Club/Supercenter")
+education_types <- c("University", "College/University", "K-12 School", "Other - Education", "Adult Education")
+food_service_types <- c("Restaurant", "Food Service", "Other - Restaurant/Bar")
+
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% multifamily_types, 
+                                                    "Multifamily Housing", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% office_types, 
+                                                    "Office Buildings", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% hospital_types, 
+                                                    "Hospitals", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% residence_types, 
+                                                    "Residential Facilities", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% warehouse_types, 
+                                                    "Warehouses", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% retail_types, 
+                                                    "Retail Spaces", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% education_types, 
+                                                    "Educational Institutions", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% food_service_types, 
+                                                    "Food Services", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+# Combine "Supermarket / Grocery Store" and "Supermarket/Grocery Store"
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(grepl("Supermarket", Bench_cleaned$PrimaryPropertyType), 
+                                                    "Supermarkets/Grocery Stores", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+
+# Check the new unique grouped primary property types
+unique_grouped_primary_property_types <- unique(Bench_cleaned$GroupedPrimaryPropertyType)
+print(unique_grouped_primary_property_types)
+
+# Extract and print unique column names
+unique_column_names <- names(Bench_cleaned)
+print(unique_column_names)
+
+```
+
+
+Group "NonResidential", "Nonresidential COS", and "Nonresidential WA" under "Nonresidential".
+Group all multifamily types like "Multifamily MR (5-9)", "Multifamily LR (1-4)", and "Multifamily HR (10+)" under "Multifamily".
+"SPS-District K-12" appears to be a specific type for schools, and "Campus" could potentially include various educational facilities. Depending on the context, these could be grouped under "Educational"
+
+Group all multifamily types like "Mid-Rise Multifamily", "Low-Rise Multifamily", "High-Rise Multifamily", "Multifamily MR (5-9)", "Multifamily LR (1-4)", and "Multifamily HR (10+)" under "Multifamily Housing".
+Combine "Small- and Mid-Sized Office", "Large Office", and "Office" into "Office Buildings".
+Group "Supermarket / Grocery Store" and "Supermarket/Grocery Store" into "Supermarkets/Grocery Stores".
+Consolidate "Hospital", "Hospital (General Medical & Surgical)", and "Other/Specialty Hospital" into "Hospitals".
+Group "Residence Hall", "Residence Hall/Dormitory", and "Other - Lodging/Residential" into "Residential Facilities".
+Combine "Warehouse", "Non-Refrigerated Warehouse", and "Refrigerated Warehouse" into "Warehouses".
+Group all retail-related types like "Retail Store", "Other - Mall", "Enclosed Mall", "Strip Mall", and "Wholesale Club/Supercenter" under "Retail Spaces".
+Combine "University", "College/University", "K-12 School", "Other - Education", "Adult Education" into "Educational Institutions".
+Group "Restaurant", "Food Service", and "Other - Restaurant/Bar" into "Food Services".
+
+
+
+```{r basic EDA}
+
+# Select only the numerical columns for correlation analysis
+numerical_data <- Bench_cleaned %>% select_if(is.numeric)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(numerical_data, use = "pairwise.complete.obs")
+
+# Find pairs with high correlation
+high_cor_matrix <- cor_matrix > 0.6
+diag(high_cor_matrix) <- FALSE  
+
+# Initialize a matrix to store the p-values
+p_values_matrix <- matrix(nrow = ncol(numerical_data), ncol = ncol(numerical_data))
+rownames(p_values_matrix) <- colnames(numerical_data)
+colnames(p_values_matrix) <- colnames(numerical_data)
+
+# Loop over the high_cor_matrix to calculate p-values
+for(i in 1:nrow(high_cor_matrix)) {
+  for(j in 1:ncol(high_cor_matrix)) {
+    if(high_cor_matrix[i, j]) {
+      test_result <- cor.test(numerical_data[[i]], numerical_data[[j]], method = "pearson")
+      p_values_matrix[i, j] <- test_result$p.value
+    }
+  }
+}
+
+# Find significant correlations with p-value < 0.05
+significant_correlations <- high_cor_matrix & p_values_matrix < 0.05
+
+# Convert the significant correlations matrix to a data frame
+significant_pairs <- which(significant_correlations, arr.ind = TRUE)
+significant_results <- data.frame(
+  Var1 = rownames(cor_matrix)[significant_pairs[, "row"]],
+  Var2 = colnames(cor_matrix)[significant_pairs[, "col"]],
+  Correlation = cor_matrix[significant_correlations],
+  P_Value = p_values_matrix[significant_correlations]
+)
+
+significant_results <- significant_results[order(-significant_results$Correlation), ]
+
+
+# Print the significant correlations with their p-values
+print(significant_results)
+
+
+```
+
+
+
+
+```{r gas vs electric}
+
+# Load the necessary library
+library(stats)
+
+# Conduct a correlation analysis between SiteEnergyUse.kBtu. and Electricity.kBtu.
+correlation_site_energy_electricity <- cor.test(Bench_cleaned$SiteEnergyUse.kBtu., 
+                                                Bench_cleaned$Electricity.kBtu., 
+                                                method = "pearson")
+
+# Print the correlation coefficient and p-value
+cat("Correlation between SiteEnergyUse.kBtu. and Electricity.kBtu.:\n")
+cat("r =", correlation_site_energy_electricity$estimate, "\n")
+cat("p-value =", correlation_site_energy_electricity$p.value, "\n\n")
+
+# Assess the correlation between TotalGHGEmissions and SiteEUI.kBtu.sf.
+correlation_ghg_siteeui <- cor.test(Bench_cleaned$TotalGHGEmissions, 
+                                    Bench_cleaned$SiteEUI.kBtu.sf., 
+                                    method = "pearson")
+
+# Print the correlation coefficient and p-value
+cat("Correlation between TotalGHGEmissions and SiteEUI.kBtu.sf.:\n")
+cat("r =", correlation_ghg_siteeui$estimate, "\n")
+cat("p-value =", correlation_ghg_siteeui$p.value, "\n\n")
+
+# Assess the correlation between TotalGHGEmissions and Electricity.kBtu.
+correlation_ghg_electricity <- cor.test(Bench_cleaned$TotalGHGEmissions, 
+                                        Bench_cleaned$Electricity.kBtu., 
+                                        method = "pearson")
+
+# Print the correlation coefficient and p-value
+cat("Correlation between TotalGHGEmissions and Electricity.kBtu.:\n")
+cat("r =", correlation_ghg_electricity$estimate, "\n")
+cat("p-value =", correlation_ghg_electricity$p.value, "\n")
+
+
+
+```
+
+
+```{r test bins for building size}
+# Calculate the quantiles for PropertyGFATotal
+quantiles <- quantile(Bench_cleaned$PropertyGFATotal, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
+
+# Round the quantiles to the nearest whole number
+quantiles <- round(quantiles)
+
+# Create more descriptive labels using the rounded quantiles
+Bench_cleaned <- Bench_cleaned %>%
+  mutate(
+    SizeBin = cut(PropertyGFATotal,
+                  breaks = quantiles,
+                  include.lowest = TRUE,
+                  labels = c(
+                    paste("Small (<= ", quantiles[2], " sqft)"),
+                    paste("Medium (", quantiles[2]+1, "-", quantiles[3], " sqft)"),
+                    paste("Large (", quantiles[3]+1, "-", quantiles[4], " sqft)"),
+                    paste("Very Large (> ", quantiles[4], " sqft)")
+                  ))
+  )
+
+# Check the new SizeBin labels
+table(Bench_cleaned$SizeBin)
+
+
+
+```
 
 
 
@@ -1077,12 +1566,52 @@ ggplot() +
 
 
 
+```{r graph age vs size}
+Bench_cleaned <- Bench_cleaned %>%
+  mutate(
+    BuildingEra = cut(YearBuilt,
+                      breaks = c(-Inf, 1940, 1980, 2000, Inf),
+                      labels = c("Pre-1940", "1940-1979", "1980-1999", "2000-present"),
+                      right = FALSE), # Ensures that the interval is left-closed
+    SizeBin = cut(PropertyGFATotal, 
+                  breaks = quantile(PropertyGFATotal, probs = seq(0, 1, by = 0.25), na.rm = TRUE), 
+                  include.lowest = TRUE, 
+                  labels = c("Small ( <= 29084  sqft)", "Medium (29085 - 45878  sqft)", "Large (45879 - 96357  sqft)", "Very Large ( > 96357  sqft)")))
+
+
+# Now you can plot the energy use and emissions for each segment
+
+# Scatter Plot of GHG Emissions vs. Site EUI for different age bins
+ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = AgeBin)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~AgeBin) +
+  labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Age", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set1")
+
+# Scatter Plot of GHG Emissions vs. Site EUI for different size bins
+ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = SizeBin)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~SizeBin) +
+  labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Size", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set1")
+
+```
 
 
 
 
 
 
+```{r SiteEnergyUse.kBtu. and Electricity.kBtu.}
+
+plot(Bench_cleaned$SiteEnergyUse.kBtu., Bench_cleaned$Electricity.kBtu.)
+plot(Bench_cleaned_no_outliers$SiteEnergyUse.kBtu., Bench_cleaned_$Electricity.kBtu.)
+
+```
 
 
 
