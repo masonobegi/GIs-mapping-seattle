@@ -1,0 +1,556 @@
+---
+title: "GIS Exploratory Data Analysis"
+author: "Group P4T2"
+date: "2024-02-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(spdep)
+library(leaflet)
+```
+
+# Data Data Cleaning for GIS Analysis
+
+```{r read data}
+
+# Read the PSE and Equity shape files
+pse_data <- st_read("../Data/PSE_Gas_Tracts_2.shp")
+equity_data <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
+
+```
+
+pse_data aggregates gas consumption data by sector, year (2020-2023), and census tract in Seattle. Equity_data integrates race, ethnicity, socioeconomic status, and health disadvantages in Seattle.
+
+Below we will create a single data frame that will include our energy data (pse_data) and be merged with the equity data (equity_data). 
+
+For equity_data we will merge on GEOID and pse_data will merge on Census_Tract. 
+
+```{r GIS - column names}
+# Get column names of pse_data and equity_data
+colnames(pse_data)
+colnames(equity_data)
+```
+
+
+```{r GIS - Prep data for merge}
+
+# Step 1: Filter the PSE data for the Grouped_Flag to TRUE
+pse_data_clean <- subset(pse_data, Grouped_Fl=='TRUE')
+
+# Step 2: Ensure the GEOID and Census_Tract columns are of the same type before merging
+pse_data_clean$Census_Tra <- as.character(pse_data_clean$Census_Tra)
+equity_data$GEOID <- as.character(equity_data$GEOID)
+
+# Step 3: Convert to regular dataframes for the merge operation, and drop geometry column from equity_data
+pse_data_df <- as.data.frame(pse_data_clean)
+equity_data_df <- as.data.frame(equity_data %>% st_set_geometry(NULL))
+
+```
+
+
+This code segment filters pse_data for entries where Grouped_Flag is set to TRUE and ensures that the identifiers (Census_Tract from pse_data and GEOID from equity_data) are of compatible data types for merging. It then converts both datasets to regular dataframes and explicitly removes the geometry column from equity_data, simplifying the merge operation.
+
+Note: In our dataset on utility energy consumption, focusing on entries with the 'grouped flag' set to true is essential. This flag indicates data aggregation across multiple census tracts to preserve privacy, reflecting broader trends without risking the identification of individual tracts. Entries with the 'grouped flag' set to false, representing unaggregated data for individual tracts, may have values of 0, signifying no or insufficient data for aggregation
+
+
+```{r GIS - Clean Energy Data}
+
+# Step 4: Renaming Columns for Clarity
+pse_data_df <- pse_data_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU=Usage_MMBT, Number_Accts=Number_Acc, Emissions_MTCO2E=Emissions_, USAGEPERCAPITA_MMBTU=USAGEPERCA, EMISSIONSPERCAPITA_MTCO2E=EMISSIONSP, RSE_Quintile=RSE_Quinti, SHAPE_Length=SHAPE_Leng)
+
+# Step 5: Checking for Null Values
+#sapply(pse_data_df, function(x) sum(is.na(x)))
+#no null values
+
+# Step 6: Standardizing Quintile Labels
+pse_data_df$RSE_Quintile<-replace(pse_data_df$RSE_Quintile, pse_data_df$RSE_Quintile == 'Highest priority/Most disadvantaged', 'Highest')
+
+# View the clean energy dataframe
+head(pse_data_df)
+
+```
+
+
+In our data cleaning process for the pse_data_df, we initiated by renaming columns to ensure clarity and consistency, making the dataset more intuitive for analysis. Subsequent steps included a comprehensive check for null values, confirming the dataset's completeness. Lastly, we standardized the quintile labels for the RSE_Quintile column, aligning them with uniform terminology. This standardization was crucial for comparative analysis, allowing for a seamless integration of data points across different metrics. 
+
+
+```{r GIS - Clean Equity Data}
+
+# Step 7: Creating a Subset of Relevant Columns (ID, location, quintiles)
+equity_data_df = subset(equity_data_df, select = c(OBJECTID, GEOID, SHAPE_Leng, SHAPE_Area, RACE_ELL_1, SOCIOECO_2, HEALTH_D_1, COMPOSIT_1))
+
+# Step 8: Renaming Columns for Clarity
+equity_data_df <- equity_data_df %>% rename(SHAPE_Length=SHAPE_Leng, RACE_ELL_ORIGINS_QUINTILE=RACE_ELL_1, SOCIOECON_DISADV_QUINTILE=SOCIOECO_2, HEALTH_DISADV_QUINTILE=HEALTH_D_1, COMPOSITE_QUINTILE=COMPOSIT_1)
+sapply(equity_data_df, function(x) sum(is.na(x)))
+
+# Step 9: Checking for Null Values
+#sapply(equity_data_df, function(x) sum(is.na(x)))
+#no null values
+
+# Step 10: Standardizing Quintile Labels
+equity_data_df[equity_data_df == 'Highest Equity Priority' | equity_data_df == 'Highest Equity Priority/Most Disadvantaged' | equity_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+
+# View the clean equity dataframe
+head(equity_data_df)
+
+```
+
+
+In our data cleaning process for the equity_data_df, we streamlined the dataset by selecting only essential columns related to ID, location, and quintile scores for various equity dimensions. We then renamed these columns for clarity. A thorough check for null values confirmed the dataset's completeness and reliability. Additionally, we standardized the labels for the highest quintile across all metrics to ensure consistency in our analysis. 
+
+
+```{r GIS - Reattach the geometry to merged_data_df}
+
+# Merging the filtered 2023 PSE data with the equity data on GEOID/Census_Tract
+merged_data_df <- inner_join(pse_data_df, equity_data_df, by = c("Census_Tra" = "GEOID"))
+
+# View the merged dataframe
+head(merged_data_df)
+
+# Step 12: Reattach the geometry to merged_data_df
+# Since merged_data_df is no longer an sf object after the join, convert it back
+# Prepare a geometry column from pse_data_clean matching Census_Tra in merged_data_df
+geometry_col <- pse_data_clean %>% 
+  select(Census_Tra, geometry) %>% 
+  distinct(Census_Tra, .keep_all = TRUE)
+
+# Step 13: Join this geometry data back to the merged dataframe
+GIS_EE <- merged_data_df %>%
+  left_join(geometry_col, by = "Census_Tra") %>%
+  st_as_sf(crs = st_crs(pse_data_clean))
+
+# View the final sf object
+head(GIS_EE)
+
+```
+
+
+An inner_join is performed based on these identifiers, merging attributes from equity_data into pse_data_2023 where their identifiers match. Finally, after cleaning, the merged dataframe is converted back into an sf object by reattaching the geometry from pse_data_2023. 
+
+This process ensures a streamlined dataset that combines relevant attributes from both sources, based on the year 2023 and matching geographic identifiers, for detailed spatial analysis.
+
+
+
+
+```{r GIS - Initial Exploratory Graphs}
+
+# Trend of emissions per capita over years
+ggplot(GIS_EE, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E, group = 1)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  labs(title = "Trend of Emissions Per Capita Over Years", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)")
+
+# Compare emissions per capita across sectors for each year
+ggplot(GIS_EE, aes(x = as.factor(CAL_YEAR), y = EMISSIONSPERCAPITA_MTCO2E, fill = Sector)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Sector-wise Emissions Per Capita Across Years", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom") 
+
+# Yearly trend in emissions per capita for each sector
+ggplot(GIS_EE, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_line(aes(color = Sector)) + 
+  geom_point(aes(color = Sector)) + 
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Yearly Trend of Emissions Per Capita by Sector", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(legend.position = "none") 
+
+```
+
+
+Above, we explore emissions per capita (EMISSIONSPERCAPITA_MTCO2E) from 2020 to 2023 and compare it among various sectors (building types). The first graph is a line plot that allows us to observe trends over the years. We can see that the trend of emissions per capita is declining, which is a positive outcome. The second graph, a boxplot, compares the distributions across sectors for each year. This graph is challenging to read because industry buildings have a substantially higher range than commercial and residential buildings, which is not surprising but again makes the graph difficult to interpret. The third graph employs a facet wrap to visualize the yearly trend for each sector. These visualizations will help us understand how emissions per capita have changed over time and how these changes vary across different building sectors.
+
+
+```{r GIS - Boxplots for Each Sector}
+
+# Creating individual boxplots for each sector across years
+ggplot(GIS_EE, aes(x = as.factor(CAL_YEAR), y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_boxplot(aes(fill = Sector)) +
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Annual Emissions Per Capita by Sector", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+
+```
+
+
+In the revised graph, the boxplot has been reformatted to focus more closely on the sectors, allowing us to interpret the data for Commercial and Industrial building types more clearly. However, the Industrial sector still presents challenges in interpretation, aside from the evident potential outliers in some industrial buildings.
+
+
+```{r GIS - Industrial}
+
+# Filter the dataset for only the Industry sector
+industry_data <- subset(GIS_EE, Sector == "Industrial")
+
+summary(industry_data$EMISSIONSPERCAPITA_MTCO2E)  # Get a summary to see the range and quartiles
+
+# Creating a boxplot for the Industry sector
+ggplot(industry_data, aes(x = as.factor(CAL_YEAR), y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0, 975)) + 
+  theme_minimal() +
+  labs(title = "Industry Sector: Annual Emissions Per Capita",
+       x = "Calendar Year",
+       y = "Emissions Per Capita (MTCO2E)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+Finally, this boxplot focuses exclusively on the industry sector, where clear outliers are evident. We will discuss how to proceed with the GIS group.
+
+
+```{r Basic Geographic Plot}
+
+# Basic Geographic Plot
+ggplot(data = GIS_EE) +
+  geom_sf(aes(color = EMISSIONSPERCAPITA_MTCO2E), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Emissions Per Capita",
+       color = "Emissions\nPer Capita (MTCO2E)") # 
+
+# Interactive Map
+leaflet(GIS_EE) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", EMISSIONSPERCAPITA_MTCO2E)(EMISSIONSPERCAPITA_MTCO2E),
+              fillOpacity = 0.5,
+              popup = ~paste("Emissions Per Capita:", EMISSIONSPERCAPITA_MTCO2E))
+
+```
+
+
+We aimed to generate geographic plots to visualize the distribution of our data points across Seattle. It appears that some energy data was omitted during the inner join. Below, we will graph the energy data before it was merged with the equity data. This omission could be due to mismatches between GEOID and Census Tract identifiers, raising questions about the extent of additional data available when examining only the energy data.
+
+
+```{r GIS - This is a test}
+
+ggplot(data = pse_data_clean) +
+  geom_sf(aes(color = EMISSIONSP), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Emissions Per Capita",
+       color = "Emissions\nPer Capita (MTCO2E)") # 
+
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", EMISSIONSP)(EMISSIONSP),
+              fillOpacity = 0.5,
+              popup = ~paste("Emissions Per Capita:", EMISSIONSP))
+
+```
+
+
+The geographic plot, utilizing energy data prior to merging with the equity data, reveals an increased number of data points. I plan to consult with the GIS team on the best path forward. My recommendation will likely involve dividing the analysis into two distinct sections for GIS: one focusing on examining energy data through an equity lens, and the other concentrating on analyzing energy usage across the Seattle area.
+
+```{r remove outliers from GIS_EE}
+
+Q1 <- quantile(GIS_EE$EMISSIONSPERCAPITA_MTCO2E, .25)
+Q3 <- quantile(GIS_EE$EMISSIONSPERCAPITA_MTCO2E, .75)
+IQR <- IQR(GIS_EE$EMISSIONSPERCAPITA_MTCO2E)
+
+GIS_EE_rem_outs <- subset(GIS_EE, GIS_EE$EMISSIONSPERCAPITA_MTCO2E> (Q1 - 1.5*IQR) & GIS_EE$EMISSIONSPERCAPITA_MTCO2E< (Q3 + 1.5*IQR))
+
+```
+
+The following visuals are based on the same variables as the ones above but with the outlier values in Emissions Per Capita removed so that patterns are clearer and there is more visual difference between areas with different emissions.
+```{r above visuals with outliers removed}
+
+# Trend of emissions per capita over years
+ggplot(GIS_EE_rem_outs, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E, group = 1)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  labs(title = "Trend of Emissions Per Capita Over Years", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)")
+
+# Yearly trend in emissions per capita for each sector
+ggplot(GIS_EE_rem_outs, aes(x = CAL_YEAR, y = EMISSIONSPERCAPITA_MTCO2E)) +
+  geom_line(aes(color = Sector)) + 
+  geom_point(aes(color = Sector)) + 
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Yearly Trend of Emissions Per Capita by Sector", x = "Calendar Year", y = "Emissions Per Capita (MTCO2E)") +
+  theme(legend.position = "none") 
+
+```
+```{r geospatial emissions without outliers}
+
+# emissions per capita
+ggplot(data = GIS_EE_rem_outs) +
+  geom_sf(aes(color = EMISSIONSPERCAPITA_MTCO2E), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Emissions Per Capita",
+       color = "Emissions\nPer Capita (MTCO2E)") 
+
+# Interactive Map
+leaflet(GIS_EE_rem_outs) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", EMISSIONSPERCAPITA_MTCO2E)(EMISSIONSPERCAPITA_MTCO2E),
+              fillOpacity = 0.5,
+              popup = ~paste("Emissions Per Capita:", EMISSIONSPERCAPITA_MTCO2E))
+```
+
+The following two maps also depict the emissions per capita in the PSE dataset only, but with outliers removed so that the variation in emissions is more visible.
+```{r remove pse data only outliers}
+
+Q1 <- quantile(pse_data_clean$EMISSIONSP, .25)
+Q3 <- quantile(pse_data_clean$EMISSIONSP, .75)
+IQR <- IQR(pse_data_clean$EMISSIONSP)
+
+pse_rem_outs <- subset(pse_data_clean, pse_data_clean$EMISSIONSP> (Q1 - 1.5*IQR) & pse_data_clean$EMISSIONSP< (Q3 + 1.5*IQR))
+```
+
+
+```{r geospatial without outliers - pse data only}
+#emissions per capita
+ggplot(data = pse_rem_outs) +
+  geom_sf(aes(color = EMISSIONSP), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Emissions Per Capita",
+       color = "Emissions\nPer Capita (MTCO2E)")  
+
+leaflet(pse_rem_outs) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", EMISSIONSP)(EMISSIONSP),
+              fillOpacity = 0.5,
+              popup = ~paste("Emissions Per Capita:", EMISSIONSP))
+
+```
+
+```{r usage per capita }
+
+ggplot(GIS_EE, aes(x = as.factor(CAL_YEAR), y = USAGEPERCAPITA_MMBTU, fill = Sector)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Sector-wise Usage Per Capita Across Years", x = "Calendar Year", y = "Usage Per Capita (MMBTU)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom") 
+
+# Trend of usage per capita over years
+ggplot(GIS_EE, aes(x = CAL_YEAR, y = USAGEPERCAPITA_MMBTU, group = 1)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  labs(title = "Trend of Usage Per Capita Over Years", x = "Calendar Year", y = "Usage Per Capita (MMBTU)")
+
+
+# Yearly trend in usage per capita for each sector
+ggplot(GIS_EE, aes(x = CAL_YEAR, y = USAGEPERCAPITA_MMBTU)) +
+  geom_line(aes(color = Sector)) + 
+  geom_point(aes(color = Sector)) + 
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Yearly Trend of Usage Per Capita by Sector", x = "Calendar Year", y = "Usage Per Capita (MMBTU)") +
+  theme(legend.position = "none") 
+
+
+ggplot(data = GIS_EE) +
+  geom_sf(aes(color = USAGEPERCAPITA_MMBTU), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Usage Per Capita",
+       color = "Usage\nPer Capita (MMBTU)") 
+
+# Interactive Map
+leaflet(GIS_EE) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", USAGEPERCAPITA_MMBTU)(USAGEPERCAPITA_MMBTU),
+              fillOpacity = 0.5,
+              popup = ~paste("Usage Per Capita:", USAGEPERCAPITA_MMBTU))
+
+
+```
+Similar to the emission data, the energy usage data also has many outliers that skew the graphs. The geographic map shows a very similar distribution of usage as emissions without the outliers removed, which is expected.
+
+```{r remove outliers in energy usage in GIS_EE}
+Q1 <- quantile(GIS_EE$EMISSIONSP, .25)
+Q3 <- quantile(GIS_EE$EMISSIONSP, .75)
+IQR <- IQR(GIS_EE$EMISSIONSP)
+
+usage_rem_outs <- subset(GIS_EE, GIS_EE$USAGEPERCAPITA_MMBTU > (Q1 - 1.5*IQR) & GIS_EE$USAGEPERCAPITA_MMBTU < (Q3 + 1.5*IQR))
+```
+
+```{r remove outliers in energy usage in GIS_EE}
+Q1 <- quantile(pse_data_clean$EMISSIONSP, .25)
+Q3 <- quantile(pse_data_clean$EMISSIONSP, .75)
+IQR <- IQR(pse_data_clean$EMISSIONSP)
+
+pse_usage_rem_outs <- subset(pse_data_clean, pse_data_clean$USAGEPERCA> (Q1 - 1.5*IQR) & pse_data_clean$USAGEPERCA< (Q3 + 1.5*IQR))
+
+```
+
+```{r energy usage with outliers removed}
+
+# Trend of usage per capita over years
+ggplot(usage_rem_outs, aes(x = CAL_YEAR, y = USAGEPERCAPITA_MMBTU, group = 1)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  labs(title = "Trend of Usage Per Capita Over Years", x = "Calendar Year", y = "Usage Per Capita (MMBTU)")
+
+
+# Yearly trend in usage per capita for each sector
+ggplot(usage_rem_outs, aes(x = CAL_YEAR, y = USAGEPERCAPITA_MMBTU)) +
+  geom_line(aes(color = Sector)) + 
+  geom_point(aes(color = Sector)) + 
+  facet_wrap(~Sector, scales = "free_y") + 
+  theme_minimal() +
+  labs(title = "Yearly Trend of Usage Per Capita by Sector", x = "Calendar Year", y = "Usage Per Capita (MMBTU)") +
+  theme(legend.position = "none") 
+
+
+#usage per capita map
+ggplot(data = usage_rem_outs) +
+  geom_sf(aes(color = USAGEPERCAPITA_MMBTU), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Usage Per Capita",
+       color = "Usage\nPer Capita (MMBTU)") 
+
+# Interactive Map
+leaflet(usage_rem_outs) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", USAGEPERCAPITA_MMBTU)(USAGEPERCAPITA_MMBTU),
+              fillOpacity = 0.5,
+              popup = ~paste("Usage Per Capita:", USAGEPERCAPITA_MMBTU))
+
+```
+After removing the outliers we can see that the usage per capita increased in 2021 and 2022, then decreased in 2023. Without outliers the map is more sparse but shows that there are clusters of neighborhoods with different usages.
+
+```{r usage per capita in pse data only with outliers removed}
+#usage per capita map
+head(pse_usage_rem_outs)
+ggplot(data = pse_usage_rem_outs) +
+  geom_sf(aes(color = USAGEPERCA), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Usage Per Capita",
+       color = "Usage\nPer Capita (MMBTU)") 
+
+# Interactive Map
+leaflet(pse_usage_rem_outs) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", USAGEPERCA)(USAGEPERCA),
+              fillOpacity = 0.5,
+              popup = ~paste("Usage Per Capita:", USAGEPERCA))
+```
+When looking at the Usage Per Capita map generated from the unjoined PSE data there is more information that is surprisingly a bit different from the Emissions Per Capita map. For example, it shows that some areas with a certain amount of emissions has less energy usage.
+```{r encode equity priority to numeric}
+#encode quantiles, 5=most disadvantaged/highest priority 1=least disadvantaged/lowest priority
+#create copy of data
+GIS_EE_encoded<-GIS_EE
+head(GIS_EE_encoded)
+
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Highest", 5, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Second Highest", 4, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Middle", 3, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Lowest", 1, GIS_EE_encoded$COMPOSITE_QUINTILE)
+
+
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Highest", 5, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Second Highest", 4, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Middle", 3, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Lowest", 1, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Highest", 5, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Second Highest", 4, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Middle", 3, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Lowest", 1, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Highest", 5, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Second Highest", 4, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Middle", 3, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Lowest", 1, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+
+GIS_EE_encoded$COMPOSITE_QUINTILE <- as.numeric(GIS_EE_encoded$COMPOSITE_QUINTILE)  
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- as.numeric(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)  
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$HEALTH_DISADV_QUINTILE)  
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)  
+
+```
+
+```{r COMPOSITE_QUINTILE equity maps}
+
+# Equity composite quintile map
+ggplot(data = GIS_EE_encoded) +
+  geom_sf(aes(color = COMPOSITE_QUINTILE), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Composite Equity Priority",
+       color = "Equity Priority") 
+
+# Interactive Map
+leaflet(GIS_EE_encoded) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", COMPOSITE_QUINTILE)(COMPOSITE_QUINTILE),
+              fillOpacity = 0.5,
+              popup = ~paste("Composite Equity Priority:", COMPOSITE_QUINTILE))
+
+
+```
+
+```{r RACE_ELL_ORIGINS_QUINTILE equity maps}
+
+ggplot(data = GIS_EE_encoded) +
+  geom_sf(aes(color = RACE_ELL_ORIGINS_QUINTILE), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Race, ELL, Origins Equity Priority",
+       color = "Equity Priority") 
+
+# Interactive Map
+leaflet(GIS_EE_encoded) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", RACE_ELL_ORIGINS_QUINTILE)(RACE_ELL_ORIGINS_QUINTILE),
+              fillOpacity = 0.5,
+              popup = ~paste("Race, ELL, Origins Equity Priority:", RACE_ELL_ORIGINS_QUINTILE))
+```
+
+```{r HEALTH_DISADV_QUINTILE equity maps}
+ggplot(data = GIS_EE_encoded) +
+  geom_sf(aes(color = HEALTH_DISADV_QUINTILE), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Health Disadvantage Equity Priority",
+       color = "Equity Priority") 
+
+# Interactive Map
+leaflet(GIS_EE_encoded) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", HEALTH_DISADV_QUINTILE)(HEALTH_DISADV_QUINTILE),
+              fillOpacity = 0.5,
+              popup = ~paste("Health Disadvantage Equity Priority:", HEALTH_DISADV_QUINTILE))
+```
+
+```{r SOCIOECON_DISADV_QUINTILE equity map}
+ggplot(data = GIS_EE_encoded) +
+  geom_sf(aes(color = SOCIOECON_DISADV_QUINTILE), size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Geographic Distribution of Socioeconomic Disadvantage Equity Priority",
+       color = "Equity Priority") 
+
+# Interactive Map
+leaflet(GIS_EE_encoded) %>%
+  addTiles() %>%
+  addPolygons(color = ~colorNumeric("viridis", SOCIOECON_DISADV_QUINTILE)(SOCIOECON_DISADV_QUINTILE),
+              fillOpacity = 0.5,
+              popup = ~paste("Socioeconomic Disadvantage Equity Priority:", SOCIOECON_DISADV_QUINTILE))
+```
+
+The above maps show the distribution of equity priority in the composite quintile and sub quintiles. The labels in the data were encoded to numerical values from 1 to 5, 1 being the lowest equity priority/least disadvantaged and 5 being the highest priority/most disadvantaged. The maps show that there is large variation in equity priority in the Seattle area and there is frequent overlap of certain equity priorities of the different sub categories.

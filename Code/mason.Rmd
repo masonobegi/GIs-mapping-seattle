@@ -136,14 +136,23 @@ median_es.p.val <- t.test(combined_data$Median_ES_Score)
 print(median_es.p.val)  
 ```
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> 6658cd77f979eadf593fae3058fdcc928c053de4
 ```{r}
 
 #correlation matrix 
 cor_data <- select(combined_data, -c(BuildingType))
 cor <- cor(cor_data)
-round(cor,2)
- 
+library(corrplot)
+corrplot(cor, method = "number")
 ```
+<<<<<<< HEAD
+=======
+>>>>>>> workspace/masono
+>>>>>>> 6658cd77f979eadf593fae3058fdcc928c053de4
 
 ```{r}
 ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
