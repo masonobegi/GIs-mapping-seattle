@@ -114,18 +114,20 @@ Bench2016_22 = rbind(Bench2016, Bench2022)
 ```
 
 ```{r}
+#Creating .csv file with all variables consistent between the dataset years.
 write.csv(Bench2016_22, "Bench2016_22.csv", row.names = FALSE)
 ```
 
 ```{r}
+#Checking for NULL values.
 null_counts <- colSums(is.na(Bench2016_22))
 
 print(null_counts)
 ```
 ```{r}
+#Taking out columns with too many NULL values to be useful.
 Bench_cleaned = subset(Bench2016_22, select = -c(ListOfAllPropertyUseTypes, SecondLargestPropertyUseType, SecondLargestPropertyUseTypeGFA, ThirdLargestPropertyUseType, ThirdLargestPropertyUseTypeGFA, YearsENERGYSTARCertified, ENERGYSTARScore, SteamUse.kBtu., NaturalGas.therms., NaturalGas.kBtu.) )
 ```
-Removed columns with too many NULL values to make the variable usable. 
 
 ```{r}
 ncol(Bench_cleaned)
@@ -133,6 +135,7 @@ colnames(Bench_cleaned)
 summary(Bench_cleaned)
 ```
 ```{r}
+#Creating new .csv file with remaining useful columns of data.
 write.csv(Bench_cleaned, "Bench_cleaned.csv", row.names = FALSE)
 ```
 
