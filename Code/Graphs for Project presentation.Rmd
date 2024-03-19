@@ -1561,7 +1561,20 @@ table(Bench_cleaned$SizeBin)
 ```
 
 
+Segmented buildings by total gross floor area to understand size impact.
 
+Size categories are as follows:
+Small: Up to 29,084 sqft - reflect individual or small business properties.
+Medium: 29,085 - 45,878 sqft - typical of mid-sized commercial buildings.
+Large: 45,879 - 96,357 sqft - larger commercial spaces and complexes.
+Very Large: Over 96,357 sqft - major commercial and industrial facilities.
+Explored how building size correlates with Site EUI and GHG emissions.
+
+Analytical Description for Building Size Graph:
+"In this graph, each point clusters by size category, offering insight into the scale of GHG emissions relative to building size. Smaller buildings tend to have a more compact cluster, suggesting uniformity in their energy use intensity. However, very large buildings display a wide variation in emissions, indicating a diverse range of energy practices and efficiency levels. This diversity highlights the importance of customizing energy-saving solutions to the size and use of the building."
+
+Presenter's Note:
+"For each slide, consider the historical context when explaining the bins for the years. Highlight how advances in building technology and shifts in energy standards have influenced the energy efficiency of buildings. For the building size slide, emphasize the importance of tailored energy efficiency strategies that take into account the unique energy profiles of buildings of different sizes."
 
 
 
@@ -1582,10 +1595,10 @@ Bench_cleaned <- Bench_cleaned %>%
 # Now you can plot the energy use and emissions for each segment
 
 # Scatter Plot of GHG Emissions vs. Site EUI for different age bins
-ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = AgeBin)) +
+ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = BuildingEra)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~AgeBin) +
+  facet_wrap(~BuildingEra) +
   labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Age", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
   theme_minimal() +
   scale_color_brewer(palette = "Set1")
@@ -1603,13 +1616,30 @@ ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = S
 
 
 
+Analyzed energy data by building era, based on construction year.
+
+Bins reflect significant periods in construction practices:
+Pre-1940: Before modern construction materials.
+1940-1979: Post-war to pre-energy crisis, varying insulation
+
+Bullet Points for Building Age:
+
+Analyzed energy data by building era, based on construction year.
+Bins reflect significant periods in construction practices:
+Pre-1940: Before modern construction materials.
+1940-1979: Post-war to pre-energy crisis, varying insulation.
+1980-1999: Introduction of energy efficiency measures.
+Post-2000: Buildings with modern energy standards.
+Observed trends between building age, Site EUI, and GHG emissions.
+
+Analytical Description for Building Age Graph:
+"The graph depicts a clear evolution in building energy performance over time. Older buildings, particularly those constructed pre-1940, show a varied relationship between Site EUI and GHG emissions. This points towards potential opportunities for retrofitting. As we move towards more recent times, the post-2000 buildings tend to have a more consistent and favorable energy profile, reflecting modern construction standards' impact on energy efficiency."
 
 
 
 ```{r SiteEnergyUse.kBtu. and Electricity.kBtu.}
 
 plot(Bench_cleaned$SiteEnergyUse.kBtu., Bench_cleaned$Electricity.kBtu.)
-plot(Bench_cleaned_no_outliers$SiteEnergyUse.kBtu., Bench_cleaned_$Electricity.kBtu.)
 
 ```
 
