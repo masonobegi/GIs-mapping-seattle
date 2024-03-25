@@ -107,18 +107,24 @@ Bench2022 <- Bench2022[,col_order]
 ```{r}
 #Binding data years together
 Bound2016_17 <- rbind(Bench2016, Bench2017)
-Bound2016_18 <- rbind(Bench2016, Bench2018)
-Bound2016_19 <- rbind(Bench2016, Bench2019)
-Bound2016_20 <- rbind(Bench2016, Bench2020)
-Bound2016_21 <- rbind(Bench2016, Bench2021)
-Bench2016_22 <- rbind(Bench2016, Bench2022)
+Bound2016_18 <- rbind(Bound2016_17, Bench2018)
+Bound2016_19 <- rbind(Bound2016_18, Bench2019)
+Bound2016_20 <- rbind(Bound2016_19, Bench2020)
+Bound2016_21 <- rbind(Bound2016_20, Bench2021)
+Bench2016_22 <- rbind(Bound2016_21, Bench2022)
 ```
+
 
 ```{r}
 #Removing variables that won't be able to be used (too many NULLs)
 Bench_cleaned = subset(Bench2016_22, select = -c(ListOfAllPropertyUseTypes, SecondLargestPropertyUseType, SecondLargestPropertyUseTypeGFA, ThirdLargestPropertyUseType, ThirdLargestPropertyUseTypeGFA, YearsENERGYSTARCertified, ENERGYSTARScore, SteamUse.kBtu., NaturalGas.therms., NaturalGas.kBtu.) )
 
 ```
+
+```{r}
+nrow(Bench_cleaned)
+```
+
 
 ```{r}
 #Looking for NULL values and 
