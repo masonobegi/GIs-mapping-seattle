@@ -1,0 +1,379 @@
+---
+title: "GIS Analysis Final"
+output: html_document
+date: "2024-03-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(spdep)
+library(leaflet)
+```
+
+```{r read data}
+
+# Read the PSE and Equity shape files
+pse_data <- st_read("../Data/PSE_Gas_Tracts_2.shp")
+equity_data <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
+
+```
+
+```{r GIS - column names}
+# Get column names of pse_data and equity_data
+colnames(pse_data)
+colnames(equity_data)
+```
+
+```{r GIS - Prep data for merge}
+
+# Step 1: Filter the PSE data for the Grouped_Flag to TRUE
+pse_data_clean <- subset(pse_data, Grouped_Fl=='TRUE')
+
+# Step 2: Ensure the GEOID and Census_Tract columns are of the same type before merging
+pse_data_clean$Census_Tra <- as.character(pse_data_clean$Census_Tra)
+equity_data$GEOID <- as.character(equity_data$GEOID)
+
+# Step 3: Convert to regular dataframes for the merge operation, and drop geometry column from equity_data
+pse_data_df <- as.data.frame(pse_data_clean)
+equity_data_df <- as.data.frame(equity_data %>% st_set_geometry(NULL))
+
+```
+
+```{r GIS - Clean Energy Data}
+
+# Step 4: Renaming Columns for Clarity
+pse_data_df <- pse_data_df %>% rename(Grouped_Flag=Grouped_Fl, Usage_MMBTU=Usage_MMBT, Number_Accts=Number_Acc, Emissions_MTCO2E=Emissions_, USAGEPERCAPITA_MMBTU=USAGEPERCA, EMISSIONSPERCAPITA_MTCO2E=EMISSIONSP, RSE_Quintile=RSE_Quinti, SHAPE_Length=SHAPE_Leng)
+
+# Step 5: Checking for Null Values
+#sapply(pse_data_df, function(x) sum(is.na(x)))
+#no null values
+
+# Step 6: Standardizing Quintile Labels
+pse_data_df$RSE_Quintile<-replace(pse_data_df$RSE_Quintile, pse_data_df$RSE_Quintile == 'Highest priority/Most disadvantaged', 'Highest')
+
+# View the clean energy dataframe
+head(pse_data_df)
+
+```
+
+```{r GIS - Clean Equity Data}
+
+# Step 7: Creating a Subset of Relevant Columns (ID, location, quintiles)
+equity_data_df = subset(equity_data_df, select = c(OBJECTID, GEOID, SHAPE_Leng, SHAPE_Area, RACE_ELL_1, SOCIOECO_2, HEALTH_D_1, COMPOSIT_1))
+
+# Step 8: Renaming Columns for Clarity
+equity_data_df <- equity_data_df %>% rename(SHAPE_Length=SHAPE_Leng, RACE_ELL_ORIGINS_QUINTILE=RACE_ELL_1, SOCIOECON_DISADV_QUINTILE=SOCIOECO_2, HEALTH_DISADV_QUINTILE=HEALTH_D_1, COMPOSITE_QUINTILE=COMPOSIT_1)
+sapply(equity_data_df, function(x) sum(is.na(x)))
+
+# Step 9: Checking for Null Values
+#sapply(equity_data_df, function(x) sum(is.na(x)))
+#no null values
+
+# Step 10: Standardizing Quintile Labels
+equity_data_df[equity_data_df == 'Highest Equity Priority' | equity_data_df == 'Highest Equity Priority/Most Disadvantaged' | equity_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+
+# View the clean equity dataframe
+head(equity_data_df)
+
+```
+
+
+```{r GIS - Reattach the geometry to merged_data_df}
+
+# Merging the filtered 2023 PSE data with the equity data on GEOID/Census_Tract
+merged_data_df <- inner_join(pse_data_df, equity_data_df, by = c("Census_Tra" = "GEOID"))
+
+# View the merged dataframe
+head(merged_data_df)
+
+# Step 12: Reattach the geometry to merged_data_df
+# Since merged_data_df is no longer an sf object after the join, convert it back
+# Prepare a geometry column from pse_data_clean matching Census_Tra in merged_data_df
+geometry_col <- pse_data_clean %>% 
+  select(Census_Tra, geometry) %>% 
+  distinct(Census_Tra, .keep_all = TRUE)
+
+# Step 13: Join this geometry data back to the merged dataframe
+GIS_EE <- merged_data_df %>%
+  left_join(geometry_col, by = "Census_Tra") %>%
+  st_as_sf(crs = st_crs(pse_data_clean))
+
+# View the final sf object
+head(GIS_EE)
+
+```
+
+```{r remove outliers from GIS_EE}
+
+Q1 <- quantile(GIS_EE$EMISSIONSPERCAPITA_MTCO2E, .25)
+Q3 <- quantile(GIS_EE$EMISSIONSPERCAPITA_MTCO2E, .75)
+IQR <- IQR(GIS_EE$EMISSIONSPERCAPITA_MTCO2E)
+
+GIS_EE_rem_outs <- subset(GIS_EE, GIS_EE$EMISSIONSPERCAPITA_MTCO2E> (Q1 - 1.5*IQR) & GIS_EE$EMISSIONSPERCAPITA_MTCO2E< (Q3 + 1.5*IQR))
+
+```
+
+```{r remove pse data only outliers}
+
+Q1 <- quantile(pse_data_clean$EMISSIONSP, .25)
+Q3 <- quantile(pse_data_clean$EMISSIONSP, .75)
+IQR <- IQR(pse_data_clean$EMISSIONSP)
+
+pse_rem_outs <- subset(pse_data_clean, pse_data_clean$EMISSIONSP> (Q1 - 1.5*IQR) & pse_data_clean$EMISSIONSP< (Q3 + 1.5*IQR))
+```
+
+
+```{r remove outliers in energy usage in GIS_EE}
+Q1 <- quantile(GIS_EE$EMISSIONSP, .25)
+Q3 <- quantile(GIS_EE$EMISSIONSP, .75)
+IQR <- IQR(GIS_EE$EMISSIONSP)
+
+usage_rem_outs <- subset(GIS_EE, GIS_EE$USAGEPERCAPITA_MMBTU > (Q1 - 1.5*IQR) & GIS_EE$USAGEPERCAPITA_MMBTU < (Q3 + 1.5*IQR))
+```
+
+```{r remove outliers in energy usage in pse_data_clean}
+Q1 <- quantile(pse_data_clean$EMISSIONSP, .25)
+Q3 <- quantile(pse_data_clean$EMISSIONSP, .75)
+IQR <- IQR(pse_data_clean$EMISSIONSP)
+
+pse_usage_rem_outs <- subset(pse_data_clean, pse_data_clean$USAGEPERCA> (Q1 - 1.5*IQR) & pse_data_clean$USAGEPERCA< (Q3 + 1.5*IQR))
+
+```
+
+```{r encode equity priority to numeric}
+#encode quantiles, 5=most disadvantaged/highest priority 1=least disadvantaged/lowest priority
+#create copy of data
+GIS_EE_encoded<-GIS_EE
+head(GIS_EE_encoded)
+
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Highest", 5, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Second Highest", 4, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Middle", 3, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Lowest", 1, GIS_EE_encoded$COMPOSITE_QUINTILE)
+
+
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Highest", 5, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Second Highest", 4, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Middle", 3, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Lowest", 1, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Highest", 5, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Second Highest", 4, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Middle", 3, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Lowest", 1, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Highest", 5, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Second Highest", 4, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Middle", 3, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Second Lowest", 2, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Lowest", 1, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+
+GIS_EE_encoded$COMPOSITE_QUINTILE <- as.numeric(GIS_EE_encoded$COMPOSITE_QUINTILE)  
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- as.numeric(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)  
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$HEALTH_DISADV_QUINTILE)  
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)  
+
+```
+```{r}
+# Filter the emissions data for the year 2023
+pse_data_2023 <- pse_data_clean %>% 
+  filter(CAL_YEAR == 2023)
+
+#create copy for reduced emissions
+reduced_pse_2023<-pse_data_2023
+reduced_pse_2023
+```
+```{r emissions per capita}
+
+quantiles <- quantile(pse_data_2023$EMISSIONSP, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+
+# Cut the Emissions_ data into bins based on these percentiles
+pse_data_2023$Emissions_Percentile <- cut(pse_data_2023$EMISSIONSP, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
+# Plot the map with emissions categorized by percentiles
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
+  geom_sf(data = pse_data_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = c("0-20%" = "yellow", "20-40%" = "green", "40-60%" = "blue", "60-80%" = "purple", "80-100%" = "red"),
+    name = "Gas Emissions\n(Percentiles)"
+  ) +
+  labs(title = "Seattle Gas Emissions Per Capita for 2023") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+
+```
+
+```{r emissions}
+
+quantiles <- quantile(pse_data_2023$Emissions_, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+
+# Cut the Emissions_ data into bins based on these percentiles
+pse_data_2023$Emissions_Percentile <- cut(pse_data_2023$Emissions_, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
+# Plot the map with emissions categorized by percentiles
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
+  geom_sf(data = pse_data_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = c("0-20%" = "yellow", "20-40%" = "green", "40-60%" = "blue", "60-80%" = "purple", "80-100%" = "red"),
+    name = "Gas Emissions\n(Percentiles)"
+  ) +
+  labs(title = "Seattle Gas Emissions for 2023") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+
+```
+
+
+
+
+```{r calculate reduced emissions per capita by proportions with total 39%}
+#sum total emissions and total for each sector
+total_sum<-sum(reduced_pse_2023$EMISSIONSP)
+
+reduced_pse_2023<-reduced_pse_2023 %>% group_by(Sector) %>%
+ mutate(reduction_fact = sum(EMISSIONSP) / total_sum * 0.39)
+
+print(head(reduced_pse_2023))
+
+#multiply data by proportions to reduce
+#reduced_pse_2023$Emissions_reduced<-reduced_pse_2023$Emissions_ *reduced_pse_2023$reduction_fact
+reduced_pse_2023<-reduced_pse_2023 %>% mutate(EMISSIONSP_reduced = EMISSIONSP * reduction_fact)
+print(head(reduced_pse_2023))
+
+```
+```{r reduced emissions per capita}
+quantiles <- quantile(reduced_pse_2023$EMISSIONSP, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+
+# Cut the Emissions_ data into bins based on these percentiles
+reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$EMISSIONSP_reduced, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
+# Plot the map with emissions categorized by percentiles
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
+  geom_sf(data = reduced_pse_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = c("0-20%" = "yellow", "20-40%" = "green", "40-60%" = "blue", "60-80%" = "purple", "80-100%" = "red"),
+    name = "Gas Emissions\n(Percentiles)"
+  ) +
+  labs(title = "Seattle Reduced Gas Emissions Per Capita for 2030") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+
+```
+```{r reduced emissions}
+reduced_pse_2023<-reduced_pse_2023 %>% mutate(Emissions_reduced = Emissions_ * reduction_fact)
+print(head(reduced_pse_2023))
+```
+
+```{r reduced emissions}
+#reduced_pse_2023$Emissions_reduced <- as.numeric(reduced_pse_2023$Emissions_reduced)
+
+quantiles <- quantile(reduced_pse_2023$Emissions_, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+
+# Cut the Emissions_ data into bins based on these percentiles
+reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$Emissions_reduced, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
+# Plot the map with emissions categorized by percentiles
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
+  geom_sf(data = reduced_pse_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = c("0-20%" = "yellow", "20-40%" = "green", "40-60%" = "blue", "60-80%" = "purple", "80-100%" = "red"),
+    name = "Gas Emissions\n(Percentiles)"
+  ) +
+  labs(title = "Seattle Reduced Gas Emissions for 2030") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+
+```
+```{r}
+reduced_pse_2023<-reduced_pse_2023 %>% mutate(EMISSIONSP_reduced = EMISSIONSP * 0.39)
+print(head(reduced_pse_2023))
+
+percent= sum(reduced_pse_2023$EMISSIONSP_reduced)/sum(reduced_pse_2023$EMISSIONSP)
+percent
+```
+
+```{r test: reduced emissions per capita with no proportions calculated - reduce all by 39%}
+quantiles <- quantile(reduced_pse_2023$EMISSIONSP, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+
+# Cut the Emissions_ data into bins based on these percentiles
+reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$EMISSIONSP_reduced, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
+# Plot the map with emissions categorized by percentiles
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
+  geom_sf(data = reduced_pse_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = c("0-20%" = "yellow", "20-40%" = "green", "40-60%" = "blue", "60-80%" = "purple", "80-100%" = "red"),
+    name = "Gas Emissions\n(Percentiles)"
+  ) +
+  labs(title = "Seattle Reduced Gas Emissions Per Capita for 2030") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+
+```
+
+
+
