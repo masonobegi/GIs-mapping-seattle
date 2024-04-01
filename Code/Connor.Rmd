@@ -4,26 +4,55 @@ output: pdf_document
 date: "2024-04-01"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+install.packages("tidyverse")
+install.packages("dplyr")
+library(tidyverse)
+library(dplyr)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+#Loading in .csv files
+Benchmarking2016 <- read.csv("../Data/2016_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2017 <- read.csv("../Data/2017_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2018 <- read.csv("../Data/2018_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2019 <- read.csv("../Data/2019_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2020 <- read.csv("../Data/2020_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2021 <- read.csv("../Data/2021_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2022 <- read.csv("../Data/2022_Building_Energy_Benchmarking.csv", header = TRUE)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+#Removing columns that are not available for year over year analysis
+Bench2016 <- subset(Benchmarking2016, select = -c(Comments,Outlier,DefaultData) )
+Bench2017 <- subset(Benchmarking2017, select = -c(Outlier,DefaultData) )
+Bench2018 <- subset(Benchmarking2018, select = -c(Compliance.Issue, EPA.Building.Sub.Type.Name) )
+Bench2019 <- subset(Benchmarking2019, select = -c(ComplianceIssue) )
+Bench2020 <- subset(Benchmarking2020, select = -c(ComplianceIssue) )
+Bench2021 <- subset(Benchmarking2021, select = -c(ComplianceIssue) )
+Bench2022 <- subset(Benchmarking2022, select = -c(ComplianceIssue) )
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+#find stores
+stores2016 = Bench2016 %>% filter(PrimaryPropertyType == "Supermarket / Grocery Store")
+#necessary cols
+stores2016 = stores2016 %>% select(OSEBuildingID,PropertyName,Address,YearBuilt,NumberofBuildings,NumberofFloors,PropertyGFATotal,PropertyGFAParking,PropertyGFABuilding.s.,ENERGYSTARScore,SiteEUIWN.kBtu.sf.,SiteEnergyUseWN.kBtu.,SourceEUIWN.kBtu.sf.,Electricity.kWh.,Electricity.kBtu.,NaturalGas.therms.,NaturalGas.kBtu.,ComplianceStatus,TotalGHGEmissions,GHGEmissionsIntensity)
+```
+
+```{r}
+#same for 2022
+stores2022 = Bench2022 %>% filter(EPAPropertyType == "Supermarket/Grocery Store")
+# 5 less stores in 2022 than 2016
+stores2022 = stores2022 %>% select(OSEBuildingID,BuildingName,Address,YearBuilt,NumberofBuildings,NumberofFloors,PropertyGFATotal,PropertyGFAParking,PropertyGFABuilding.s.,ENERGYSTARScore,SiteEUIWN.kBtu.sf.,SiteEnergyUseWN.kBtu.,SourceEUIWN.kBtu.sf.,Electricity.kWh.,Electricity.kBtu.,NaturalGas.therms.,NaturalGas.kBtu.,ComplianceStatus,TotalGHGEmissions,GHGEmissionsIntensity)
+```
+
+
+
+
+
+
+
+
