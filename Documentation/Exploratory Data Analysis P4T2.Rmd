@@ -1,6 +1,6 @@
 ---
 title: "Exploratory Data Analysis for Seattle Building Energy Analysis"
-author: "P4T2"
+author: "P4T2" 
 date: "2024-03-05"
 output:
   html_document:
@@ -8,6 +8,8 @@ output:
   pdf_document: default
   word_document: default
 ---
+Project 4 Team 2 alphabetically: Bogi Britschgi, Kalin Kluth, Mason Obegi, Connor Olmstead, Laura Pelayo Uribe
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
@@ -149,7 +151,7 @@ We no longer have any missing values in our PSE data.
 Building Performance Data: To get rid of NA values in the data set we used the command na.omit. When using na.omit, it removes every row that has an NA value. There is a data set for each year from 2016 to 2022. The 2017 data is the only data set that has columns named Low/High Outlier cutoff, and for those columns almost every single row has an NA value. Therefore, we would have been only left with 3 rows for the whole 2017 dataset. Because of that, we deemed these columns unnecessary and removed them from the 2017 dataset. For the rest of the data sets as well as the 2017 data set, omitting NA values allows for cleaner exploratory data analysis now even though we may revisit with these rows in the future.
 
 
-Benchmarking Data: The Benchmark Energy by Individual Building data was very inconsistent. To address this, we added columns of NA values to the years that did not have all of the variables that the other years. Next, we organized the variables for all years so that they matched. Then we removed the columns of data with too many null values to be useful for analysis. Lastly, we bound the years of data together into one data set.
+Benchmarking Data: The Benchmark Energy by Individual Building data was very inconsistent. To address this, we added columns of NA values to the years that did not have all of the variables as the other years. Next, we organized the variables for all years so that they matched. We then removed the columns of data containing too many null values to be useful for analysis. Lastly, we bound the years of data together into one dataset.
 
 
 ```{r Converting and Manipulating Character Data, echo=FALSE}
@@ -273,7 +275,7 @@ null_counts
 summary(Bench_cleaned)
 ```
 
-Benchmarking Data: After merging data into one file using rbind by year, we then removed the null values. This included columns that had too many null values for use, and probably would not have been of use anyways.
+Benchmarking Data: After merging data into one file using rbind by year, we then removed the null values. This included columns containing too many null values for usefulness.
 
 
 ```{r}
@@ -294,7 +296,8 @@ Bench_cleaned <- Bench_cleaned %>% mutate(GHGEmissionsIntensity = ifelse(is.na(G
 #Last of group NULL value address for Benchmarking data
 ```
 
-Benchmarking Data: Substituted in mean values taken from summary data to replace NULL values for numerical columns. Not logical to replace the mean for categorical variables.
+Benchmarking Data: 
+To address NA values in the numerical fields, we substituted the column means, taken from summary data, to replace NULL values. We left the categorical variable NA values alone for now.
 
 ```{r Ensuring Data Integrity, echo=FALSE}
 
@@ -330,7 +333,7 @@ colnames(data2021) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_
 
 colnames(data2022) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
 
-#we are doign 3 checks to see if every column in every year is in 2022, 2016 and 2018 respecitvely as I was having issues with incompatible dataset before
+#we are doing 3 checks to see if every column in every year is in 2022, 2016 and 2018 respectively as I was having issues with incompatible dataset before
 data2016 <- data2016[, colnames(data2016) %in% colnames(data2022)]
 data2017 <- data2017[, colnames(data2017) %in% colnames(data2022)]
 data2018 <- data2018[, colnames(data2018) %in% colnames(data2022)]
@@ -471,7 +474,7 @@ for(column in columns_to_check) {
 
 ```
 
-In the PSE and equity data cleaning process, we prioritized data integrity, ensuring the accuracy and consistency of our datasets throughout their lifecycle. This process began with the crucial step of renaming columns to enhance clarity and consistency, thereby making the datasets more intuitive for analysis.
+In the PSE and equity data cleaning process, we prioritized data integrity, ensuring the accuracy and consistency of our datasets throughout their life cycle. This process began with the crucial step of renaming columns to enhance clarity and consistency, thereby making the datasets more intuitive for analysis.
 
 Type Checking and Format Alignment: We checked data types across all columns, ensuring numeric and categorical data were correctly identified. This step included verifying that numeric columns were accurately typed as integers, and categorical data was appropriately classified. For spatial data integrity, particularly in the conversion back to an sf object, we maintained a strict adherence to ensuring that the coordinate reference system (CRS) was consistently defined, preserving the spatial accuracy essential for geographic analyses.
 
@@ -772,7 +775,7 @@ For the industrial sector, known for its significant variance, we will leverage 
 
 The sector-specific analysis will also dissect energy usage across commercial and industrial realms, employing Gas Consumption as a principal metric to pinpoint high-energy consumption areas. Integrating an equity perspective with a sector specific analysis, will allow us to showcase a holistic energy consumption patterns across different sectors but also to bring to light any disparities in energy use efficiency that align with socioeconomic and demographic factors. 
 
-# Building Performance Exploratory Data Analysis
+Building Performance Exploratory Data Analysis
 For building performance data, a few graphs that show important metrics that we may want to analyze further
 
 ```{r}
@@ -791,11 +794,11 @@ ggplot(combined_data, aes(x = Median_Year_Built)) +
        y = "Frequency")
 ```
 
-Gross Floor Area: Total space inside a building measured in square feet, also measured across all floors of a building
+Gross Floor Area: Total space inside a building measured in square feet, also measured across all floors of a building.
 
-Distribution of Gross Floor Area: The x-axis is in tens of millions. The highest values in this graph are office buildings and mid rise multi-family buildings (apartments)
+Distribution of Gross Floor Area: The x-axis is in tens of millions. The highest values in this graph are office buildings and mid rise multi-family buildings (apartments).
 
-Distribution of Median Year Built: Seattle is a relatively old city, the newest buildings are built in 2005. This means that most buildings would be built before energy consumption was a public concern
+Distribution of Median Year Built: Seattle is a relatively old city, the newest buildings are built in 2005. This means that most buildings would be built before energy consumption was a public concern.
 
 ```{r}
 print("Total Gross Floor Area")
@@ -809,7 +812,7 @@ median_es.p.val <- t.test(combined_data$Median_ES_Score)
 print(median_es.p.val)  
 ```
 
-Get the summary data and t-tests for gross floor area and median Energy star score
+Get the summary data and t-tests for gross floor area and median Energy star score.
 Energy Star score is a comprehensive snapshot of the buildings energy performance,the score is 1-100 and assesses how your building is performing as a whole, taking into account its physical attributes, its operations, and how the people inside use it.
 
 The P-value rejects the null hypothesis and shows that the median ES score and the total GFA are not varying wildly.
@@ -822,7 +825,7 @@ ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
        y = "Total_GFA")
 ```
 
-Wanted to test the theory that buildings get bigger as time goes on. We can see a positive correlation especially for the biggest buildings for each time period/year. 
+We wanted to test the theory that buildings get bigger as time goes on. We can see a positive correlation especially for the biggest buildings for each time period/year. 
 
 ```{r}
 #plot median year built vs median EUI
@@ -874,16 +877,24 @@ Quick correlation matrix to see which columns can be correlated. EUI scores are 
 # Building Energy Benchmarking Exploratory Data Analysis
 
 ```{r}
+
 correlation_matrix <- cor(Bench_numerical)
+print(correlation_matrix)
 heatmap(correlation_matrix,
         col = colorRampPalette(c("blue", "white", "red"))(100),
         scale = "none",
         symm = TRUE,
         main = "Correlation Heatmap of Quantfiable Variables")
 ```
+Terminology Reference:
+GFA: Gross Floor Area
+EUI: Energy Use Intensity
+WN: Weather Normalized
+kWh: Kilowatts
+kBtu: British Thermal Unit
+GHG: Greenhouse Gas
 
-
-
+The correlation matrix shows that there are some relationships we should explore further. For instance: Site Energy Use has a useful relationship with with greenhouse gas emission intensity and total greenhouse gas emissions is positively related to electricity use. 
 
 ```{r}
 # Create boxplots to look for Outliers
@@ -909,8 +920,7 @@ boxplot(Bench_cleaned$GHGEmissionsIntensity, col = "aquamarine", main = "GHG Emi
 par(mfrow = c(1, 1))
 ```
 
-Visual map of outliers, but chose not to remove outliers because they represent individual buildings and the variation is to be expected between different types of buildings in different locations.
-
+The boxplots for the Energy Benchmarking per Building show that there are many outliers in the data set. The variation in this data is to be expected as skyscrapers will use more energy than one-story buildings. Some businesses will use large quantities of energy while others will not. The outliers will help us understand what the biggest contributors to energy use and greenhouse gas emissions are. We will look into these relationships in further analysis.
 
 ```{r}
 #Creating Histograms to Visualize Distribution
@@ -936,8 +946,7 @@ hist(Bench_cleaned$GHGEmissionsIntensity, main = "GHG Emissions Intensity", xlab
 par(mfrow = c(1, 1))
 ```
 
-
-Histograms also show distribution of data and that there exists outliers.
+Histograms also visually portray the distribution of the data, showing that for most fields, the highest values are an exception to the norm.
 
 # Conclusion
 
