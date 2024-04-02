@@ -1595,23 +1595,32 @@ Bench_cleaned <- Bench_cleaned %>%
 # Now you can plot the energy use and emissions for each segment
 
 # Scatter Plot of GHG Emissions vs. Site EUI for different age bins
-ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = BuildingEra)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~BuildingEra) +
-  labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Age", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
-  theme_minimal() +
-  scale_color_brewer(palette = "Set1")
+# ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = BuildingEra)) +
+#   geom_point(alpha = 0.5) +
+#   geom_smooth(method = "lm", se = FALSE) +
+#   facet_wrap(~BuildingEra) +
+#   labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Age", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
+#   theme_minimal() +
+#   scale_color_brewer(palette = "Set1") + 
+#   coord_cartesian(xlim = c(0,750), ylim = c(0,5000))
+# 
+# # Scatter Plot of GHG Emissions vs. Site EUI for different size bins
+# ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = SizeBin)) +
+#   geom_point(alpha = 0.5) +
+#   geom_smooth(method = "lm", se = FALSE) +
+#   facet_wrap(~SizeBin) +
+#   labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Size", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
+#   theme_minimal() +
+#   scale_color_brewer(palette = "Set1") + 
+#   coord_cartesian(xlim = c(0,750), ylim = c(0,2500))
+# 
 
-# Scatter Plot of GHG Emissions vs. Site EUI for different size bins
-ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = SizeBin)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~SizeBin) +
-  labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Size", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
-  theme_minimal() +
-  scale_color_brewer(palette = "Set1")
+model_age <- lm(TotalGHGEmissions ~ BuildingEra, data = Bench_cleaned)
+model_size <- lm(TotalGHGEmissions ~ SizeBin, data = Bench_cleaned)
 
+
+summary(model_age)
+summary(model_size)
 ```
 
 

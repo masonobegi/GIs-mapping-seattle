@@ -102,6 +102,7 @@ combined_data <- bind_rows(
   mutate(data2021, Year = 2021),
   mutate(data2022, Year = 2022)
 )
+combined_data<- combined_data[combined_data$BuildingType != "Citywide", ]
 
 
 ```
@@ -136,8 +137,6 @@ median_es.p.val <- t.test(combined_data$Median_ES_Score)
 print(median_es.p.val)  
 ```
 
-<<<<<<< HEAD
-=======
 ```{r}
 
 #correlation matrix 
@@ -146,7 +145,7 @@ cor <- cor(cor_data)
 library(corrplot)
 corrplot(cor, method = "number")
 ```
->>>>>>> workspace/masono
+
 
 ```{r}
 ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
@@ -208,3 +207,120 @@ h. got it
 i. got it 
 
 j. As for right now there are no major correlations I am seeing escept for Total Gross Floor Area slowly going down over time. Speciifcally with a huge drop starting in 2020. There are only a few outliers. The data was cleaned cery well and there was no real challenge past that point to do data visualization.
+
+
+```{r}
+library(forecast)
+
+forecasting_grocery <- combined_data %>% filter(grepl("Grocery", BuildingType))
+grocery_ts <- ts(forecasting_grocery$Median_EUI, start = min(forecasting_grocery$Year), frequency = 1)
+forecast_mod_grocery <-auto.arima(grocery_ts)
+forecast_val_grocery <- forecast(forecast_mod_grocery, h = 8)
+print(forecast_val_grocery)
+autoplot(forecast_val_grocery)
+```
+
+
+```{r}
+forecasting_grocery <- combined_data %>% filter(grepl("Grocery", BuildingType))
+grocery_ts_25 <- ts(forecasting_grocery$Percentile_25th_EUI, start = min(forecasting_grocery$Year), frequency = 1)
+forecast_mod_grocery <-auto.arima(grocery_ts_25)
+forecast_val_grocery <- forecast(forecast_mod_grocery, h = 8)
+print(forecast_val_grocery)
+
+autoplot(grocery_ts_25)
+
+lm_grocery_mod_25 <- lm(forecasting_grocery$Percentile_25th_EUI ~ Year, data = forecasting_grocery)
+
+predicted_eui_grocery <- predict(lm_grocery_mod_25, newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
+predicted_eui_grocery
+ggplot(data = forecasting_grocery, aes(x = Year, y = Percentile_25th_EUI)) +
+  geom_point() + 
+  geom_smooth(method = 'lm') + 
+  geom_point(data = data.frame(Year = c(2023,2024,2025,2026,2027), Predicted_EUI = predicted_eui_grocery), aes(x = Year, y = Predicted_EUI))
+
+lm_grocery_mod_75 <- lm(forecasting_grocery$Percentile_75th_EUI ~ Year, data = forecasting_grocery)
+
+predicted_eui_grocery <- predict(lm_grocery_mod_75, newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
+predicted_eui_grocery
+```
+
+```{r}
+lm_grocery_mod <- lm(Median_EUI ~ Year, data = forecasting_grocery)
+
+predicted_eui_grocery <- predict(lm_grocery_mod, newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
+predicted_eui_grocery
+```
+
+
+```{r}
+library(cluster)
+
+clustering_data <- combined_data %>% 
+  select(-BuildingType, -Year)
+clustering_data <- scale(clustering_data)
+
+kmeans_data <- kmeans(clustering_data, centers = 3)
+kmeans_combined <- cbind(combined_data, Cluster = kmeans_data$cluster)
+pca_data <- prcomp(clustering_data)
+cluster_plot <- data.frame(P1 = pca_data$x[,1], P2 = pca_data$x[,2], Cluster = factor(kmeans_data$cluster))
+
+ggplot(cluster_plot, aes(x = P1, y = P2, color = Cluster)) +
+  geom_point()
+```
+
+```{r}
+eui_by_year <-
+  combined_data %>%
+  group_by(Year) %>%
+  summarize(Total_Median_EUI = sum(Median_EUI))
+
+eui_by_year
+
+total_eui_forecast <- ts(eui_by_year$Total_Median_EUI, start = min(eui_by_year$Year), frequency = 1)
+
+ses_data = ses(total_eui_forecast)
+ses_forecast <- forecast(ses_data, h = 3)
+autoplot(ses_forecast)
+
+forecast_mod_total_eui <-auto.arima(total_eui_forecast)
+forecast_val_total_eui <- forecast(forecast_mod_total_eui, h = 8)
+print(forecast_val_total_eui)
+
+lm_total_eui_mod_25 <- lm(eui_by_year$Total_Median_EUI ~ Year, data = eui_by_year)
+
+predicted_eui <- predict(lm_total_eui_mod_25, newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
+
+ggplot(data = eui_by_year, aes(x = Year, y = eui_by_year$Total_Median_EUI)) +
+  geom_point() + 
+  geom_smooth(method = 'lm') + 
+  geom_point(data = data.frame(Year = c(2023,2024,2025,2026,2027), Predicted_EUI = predicted_eui), aes(x = Year, y = Predicted_EUI))
+
+summary(eui_by_year)
+
+```
+```{r}
+eui_by_year <-
+  combined_data %>%
+  group_by(Year) %>%
+  filter(Year != 2020)%>%
+  summarize(Total_Median_EUI = sum(Median_EUI))
+
+eui_by_year
+
+total_eui_forecast <- ts(eui_by_year$Total_Median_EUI, start = min(eui_by_year$Year), frequency = 1)
+forecast_mod_total_eui <-auto.arima(total_eui_forecast)
+forecast_val_total_eui <- forecast(forecast_mod_total_eui, h = 8)
+print(forecast_val_total_eui)
+
+lm_total_eui_mod_25 <- lm(eui_by_year$Total_Median_EUI ~ Year, data = eui_by_year)
+
+predicted_eui <- predict(lm_total_eui_mod_25, newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
+
+ggplot(data = eui_by_year, aes(x = Year, y = eui_by_year$Total_Median_EUI)) +
+  geom_point() + 
+  geom_smooth(method = 'lm') + 
+  geom_point(data = data.frame(Year = c(2023,2024,2025,2026,2027), Predicted_EUI = predicted_eui), aes(x = Year, y = Predicted_EUI))
+
+```
+
