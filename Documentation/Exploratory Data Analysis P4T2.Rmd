@@ -258,11 +258,11 @@ Bench2022 <- Bench2022[,col_order]
 
 #Binding data years together
 Bound2016_17 <- rbind(Bench2016, Bench2017)
-Bound2016_18 <- rbind(Bench2016, Bench2018)
-Bound2016_19 <- rbind(Bench2016, Bench2019)
-Bound2016_20 <- rbind(Bench2016, Bench2020)
-Bound2016_21 <- rbind(Bench2016, Bench2021)
-Bench2016_22 <- rbind(Bench2016, Bench2022)
+Bound2016_18 <- rbind(Bound2016_17, Bench2018)
+Bound2016_19 <- rbind(Bound2016_18, Bench2019)
+Bound2016_20 <- rbind(Bound2016_19, Bench2020)
+Bound2016_21 <- rbind(Bound2016_20, Bench2021)
+Bench2016_22 <- rbind(Bound2016_21, Bench2022)
 
 #Now that data is merged we can take care of null values as a whole
 
@@ -277,23 +277,53 @@ summary(Bench_cleaned)
 
 Benchmarking Data: After merging data into one file using rbind by year, we then removed the null values. This included columns containing too many null values for usefulness.
 
+```{r}
+
+```
 
 ```{r}
 #Substituting in mean values for NULLs
-Bench_cleaned <- Bench_cleaned %>% mutate(NumberofBuildings = ifelse(is.na(NumberofBuildings), 1.122, NumberofBuildings))
-Bench_cleaned <- Bench_cleaned %>% mutate(LargestPropertyUseTypeGFA = ifelse(is.na(LargestPropertyUseTypeGFA), 82861, LargestPropertyUseTypeGFA))
-Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUI.kBtu.sf. = ifelse(is.na(SiteEUI.kBtu.sf.), 53.61, SiteEUI.kBtu.sf.))
-Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUIWN.kBtu.sf. = ifelse(is.na(SiteEUIWN.kBtu.sf.), 54.20, SiteEUIWN.kBtu.sf.))
-Bench_cleaned <- Bench_cleaned %>% mutate(SourceEUI.kBtu.sf. = ifelse(is.na(SourceEUI.kBtu.sf.), 125.1, SourceEUI.kBtu.sf.))
-Bench_cleaned <- Bench_cleaned %>% mutate(SourceEUIWN.kBtu.sf. = ifelse(is.na(SourceEUIWN.kBtu.sf.), 125.9, SourceEUIWN.kBtu.sf.))
-Bench_cleaned <- Bench_cleaned %>% mutate(SiteEnergyUse.kBtu. = ifelse(is.na(SiteEnergyUse.kBtu.), 5589121, SiteEnergyUse.kBtu.))
-Bench_cleaned <- Bench_cleaned %>% mutate(SiteEnergyUseWN.kBtu. = ifelse(is.na(SiteEnergyUseWN.kBtu.), 5434499, SiteEnergyUseWN.kBtu.))
-Bench_cleaned <- Bench_cleaned %>% mutate(Electricity.kWh. = ifelse(is.na(Electricity.kWh.), 1065563, Electricity.kWh.))
-Bench_cleaned <- Bench_cleaned %>% mutate(Electricity.kBtu. = ifelse(is.na(Electricity.kBtu.), 3635701, Electricity.kBtu.))
-Bench_cleaned <- Bench_cleaned %>% mutate(TotalGHGEmissions = ifelse(is.na(TotalGHGEmissions), 120.06, TotalGHGEmissions))
-Bench_cleaned <- Bench_cleaned %>% mutate(GHGEmissionsIntensity = ifelse(is.na(GHGEmissionsIntensity), 1.111, GHGEmissionsIntensity))
+Bench_cleaned <- Bench_cleaned %>% mutate(NumberofBuildings = ifelse(is.na(NumberofBuildings), 1.144, NumberofBuildings))
+Bench_cleaned <- Bench_cleaned %>% mutate(NumberofFloors = ifelse(is.na(NumberofFloors), 4.0, NumberofFloors))
+Bench_cleaned <- Bench_cleaned %>% mutate(LargestPropertyUseTypeGFA = ifelse(is.na(LargestPropertyUseTypeGFA), 83856, LargestPropertyUseTypeGFA))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUI.kBtu.sf. = ifelse(is.na(SiteEUI.kBtu.sf.), 86.0, SiteEUI.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUIWN.kBtu.sf. = ifelse(is.na(SiteEUIWN.kBtu.sf.), 86.0, SiteEUIWN.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SourceEUI.kBtu.sf. = ifelse(is.na(SourceEUI.kBtu.sf.), 153.3, SourceEUI.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SourceEUIWN.kBtu.sf. = ifelse(is.na(SourceEUIWN.kBtu.sf.), 153.4, SourceEUIWN.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEnergyUse.kBtu. = ifelse(is.na(SiteEnergyUse.kBtu.), 1.300e+07, SiteEnergyUse.kBtu.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEnergyUseWN.kBtu. = ifelse(is.na(SiteEnergyUseWN.kBtu.), 1.280e+07, SiteEnergyUseWN.kBtu.))
+Bench_cleaned <- Bench_cleaned %>% mutate(Electricity.kWh. = ifelse(is.na(Electricity.kWh.), 1034023, Electricity.kWh.))
+Bench_cleaned <- Bench_cleaned %>% mutate(Electricity.kBtu. = ifelse(is.na(Electricity.kBtu.), 3584336, Electricity.kBtu.))
+Bench_cleaned <- Bench_cleaned %>% mutate(TotalGHGEmissions = ifelse(is.na(TotalGHGEmissions), 129.5, TotalGHGEmissions))
+Bench_cleaned <- Bench_cleaned %>% mutate(GHGEmissionsIntensity = ifelse(is.na(GHGEmissionsIntensity), 1.186, GHGEmissionsIntensity))
 
-#Last of group NULL value address for Benchmarking data
+```
+
+```{r}
+Bench_cleaned <- Bench_cleaned %>%
+  mutate(
+    NumberofBuildings = ifelse(is.na(NumberofBuildings), 1.144, NumberofBuildings),
+    NumberofFloors = ifelse(is.na(NumberofFloors), 4.0, NumberofFloors),
+    LargestPropertyUseTypeGFA = ifelse(is.na(LargestPropertyUseTypeGFA), 83856, LargestPropertyUseTypeGFA),
+    `SiteEUI.kBtu.sf.` = ifelse(is.na(`SiteEUI.kBtu.sf.`), 86.0, `SiteEUI.kBtu.sf.`),
+    `SiteEUIWN.kBtu.sf.` = ifelse(is.na(`SiteEUIWN.kBtu.sf.`), 86.0, `SiteEUIWN.kBtu.sf.`),
+    `SourceEUI.kBtu.sf.` = ifelse(is.na(`SourceEUI.kBtu.sf.`), 153.3, `SourceEUI.kBtu.sf.`),
+    `SourceEUIWN.kBtu.sf.` = ifelse(is.na(`SourceEUIWN.kBtu.sf.`), 153.4, `SourceEUIWN.kBtu.sf.`),
+    SiteEnergyUse.kBtu. = ifelse(is.na(SiteEnergyUse.kBtu.), 1.300e+07, SiteEnergyUse.kBtu.),
+    SiteEnergyUseWN.kBtu. = ifelse(is.na(SiteEnergyUseWN.kBtu.), 1.280e+07, SiteEnergyUseWN.kBtu.),
+    Electricity.kWh. = ifelse(is.na(Electricity.kWh.), 1034023, Electricity.kWh.),
+    Electricity.kBtu. = ifelse(is.na(Electricity.kBtu.), 3584336, Electricity.kBtu.),
+    TotalGHGEmissions = ifelse(is.na(TotalGHGEmissions), 129.5, TotalGHGEmissions),
+    GHGEmissionsIntensity = ifelse(is.na(GHGEmissionsIntensity), 1.186, GHGEmissionsIntensity)
+  )
+
+colSums(is.na(Bench_cleaned))
+
+```
+
+
+```{r}
+summary(Bench_cleaned)
 ```
 
 Benchmarking Data: 
