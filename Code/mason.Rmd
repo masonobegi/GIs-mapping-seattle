@@ -299,6 +299,7 @@ ggplot(data = eui_by_year, aes(x = Year, y = eui_by_year$Total_Median_EUI)) +
 summary(eui_by_year)
 
 ```
+
 ```{r}
 eui_by_year <-
   combined_data %>%
