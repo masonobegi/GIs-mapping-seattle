@@ -272,6 +272,7 @@ reduced_pse_2023<-reduced_pse_2023 %>% mutate(EMISSIONSP_reduced = EMISSIONSP * 
 print(head(reduced_pse_2023))
 
 ```
+
 ```{r reduced emissions per capita}
 quantiles <- quantile(reduced_pse_2023$EMISSIONSP, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
 
