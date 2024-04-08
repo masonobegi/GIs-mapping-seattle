@@ -10,7 +10,7 @@ library(RColorBrewer)
 # Data
 PSE_TEST <- st_read("../../Data/PSE.shp")
 Equity_TEST <- st_read("../../Data/Equity_RSE.shp")
-
+PSE2023_TEST<-st_read("../../Data/PSE2023.shp")
 
 # UI
 ui <- fluidPage(
@@ -34,12 +34,25 @@ ui <- fluidPage(
                             verbatimTextOutput("gasUsageInfo") # Text box for gas usage info
                           )
                  ),
-                 tabPanel("Reduction Model", "Reduction Model content will be placed here.")
+                 tabPanel("Reduced Emissions",
+                          fluidPage(
+                            fluidRow(
+                              column(6,
+                                textOutput("graphTitle1"),
+                                leafletOutput("reducedEPAmap")
+                                ),
+                              column(6,
+                                     textOutput("graphTitle2"),
+                                     leafletOutput("reducedTotalmap")
+                                )
+                        
+                            )
+                          )
                )
       )
     )
   )
-)
+))
 
 # Server
 server <- function(input, output, session) {
@@ -80,6 +93,18 @@ server <- function(input, output, session) {
            "80th-100th percentile (Highest Equity Priority)\n\n",
            "The Gas Usage Per Account color scale is divided into three quantile bins representing:",
            "\n0% - 33% (green), \n33% - 67% (yellow), \n67% - 100% (red).")
+  })
+  
+  output$graphTitle1 <- renderText({
+    "Idealistic Gas Emissions Per Capita Reduced by 39% \n"
+  })
+  
+  output$graphTitle2 <- renderText({
+    "Gas Emissions Per Capita Reduced by 39% \n"
+  })
+  
+  output$reductionInfo<-renderText({
+    paste0("")
   })
   
   # Map for Emissions Per Account
@@ -153,6 +178,73 @@ server <- function(input, output, session) {
   })
   
   
+  #reduced emissions by proportion
+  output$reducedEPAmap <- renderLeaflet({
+    emissionsReducedPalette <- colorQuantile(c("green", "yellow", "red"),#c("0-20%" = "#2dc937", "20-40%" = "#99c140", "40-60%" = "#e7b416", "60-80%" = "#db7b2b", "80-100%" = '#cc3232')
+                                     domain = PSE2023$`Emissions Per Account`,
+                                     n = 3)
+    
+    leaflet(PSE2023) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addPolygons(
+        fillColor = ~emissionsReducedPalette(epa_reduced),
+        weight = 2,
+        opacity = 1,
+        color = "white",
+        dashArray = "3",
+        fillOpacity = 0.7,
+        highlightOptions = highlightOptions(
+          weight = 5,
+          color = "#666",
+          dashArray = "",
+          fillOpacity = 0.7,
+          bringToFront = TRUE),
+        label = ~paste0("RSE Quintile: ", RSE_Quintile),
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px",
+          direction = "auto")
+      ) %>%
+      addLegend(pal = emissionsReducedPalette, 
+                values = ~epa_reduced,
+                opacity = 0.7, 
+                title = "Reduced Emissions Per Account",
+                position = "bottomright")
+  })
+  
+  #reduced emissions by 39% across
+  output$reducedTotalmap <- renderLeaflet({
+    ReducedTotalPalette <- colorQuantile(c("green", "yellow", "red"),
+                                             domain = PSE2023$`Emissions Per Account`,
+                                             n = 3)
+    
+    leaflet(PSE2023) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addPolygons(
+        fillColor = ~ReducedTotalPalette(epa_reduced_total),
+        weight = 2,
+        opacity = 1,
+        color = "white",
+        dashArray = "3",
+        fillOpacity = 0.7,
+        highlightOptions = highlightOptions(
+          weight = 5,
+          color = "#666",
+          dashArray = "",
+          fillOpacity = 0.7,
+          bringToFront = TRUE),
+        label = ~paste0("RSE Quintile: ", RSE_Quintile),
+        labelOptions = labelOptions(
+          style = list("font-weight" = "normal", padding = "3px 8px"),
+          textsize = "15px",
+          direction = "auto")
+      ) %>%
+      addLegend(pal = ReducedTotalPalette, 
+                values = ~epa_reduced_total,
+                opacity = 0.7, 
+                title = "Reduced Emissions Per Account",
+                position = "bottomright")
+  })
 }
 
 # Run Application
