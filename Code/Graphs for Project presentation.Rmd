@@ -1,0 +1,1658 @@
+---
+title: "Exploratory Data Analysis for Seattle Building Energy Analysis"
+author: "P4T2"
+date: "2024-03-05"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(sf)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(spdep)
+library(leaflet)
+library(RColorBrewer)
+library(corrplot)
+library(spdep)
+library(scales)
+```
+
+# Introduction
+
+In Seattle, buildings are one of the largest sources of climate pollution, responsible for more than a third of our city's Greenhouse Gas emissions, with over 90% of these emissions resulting from burning fossil fuels like fracked gas for heat, hot water, and appliances. These emissions pollute our air and accelerate climate change, which disproportionately harms Seattle's Black, Indigenous, and People of Color (BIPOC) communities. For our health and resilience in the face of a changing climate, Seattle is committed to eliminating climate pollution and transitioning to 100% clean energy in our buildings and vehicles by 2050. 
+
+To do this, Seattle must dramatically reduce fossil fuel use in buildings over the next decades. We must power more of our lives, homes, and buildings with cleaner energy -- constructing all-electric new buildings and retrofitting older buildings to phase out higher emissions fuels like gas and oil.
+
+Our project delves into the challenge of climate pollution from Seattle's buildings, particularly highlighting the disproportionate impact on BIPOC communities due to fossil fuel consumption. By integrating data from the City of Seattle's Open Data portal, including the Racial and Social Equity Composite Index and aggregated gas consumption metrics, our analysis adopts an equity lens to scrutinize energy use and emissions across neighborhoods. This is in efforts towards creating a more sustainable and inclusive urban landscape. We will also be analyzing energy performance data from buildings over 20,000 square feet and summarizing energy usage across different building types from 2015 to 2022.
+has context menu
+
+
+# Read Data
+
+```{r read data, echo=FALSE}
+
+# Read the PSE and Equity shape files for GIS
+pse_data <- st_read("../Data/PSE_Gas_Tracts_2.shp")
+equity_data <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
+
+
+#Read in building performance data
+library(dplyr)
+data2022 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2022.csv")
+data2021 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2021.csv")
+data2020 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2020.csv")
+data2019 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2019.csv")
+data2018 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2018.csv")
+data2017 <- read.csv("../Data/Performance_Ranges_by_Building_Type_2017.csv")
+data2016 <- read.csv("../Data/Performance_Ranges_By_Building_Type_2016.csv")
+
+#Read benchmarking data
+
+#Loading in .csv files
+Benchmarking2016 <- read.csv("../Data/2016_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2017 <- read.csv("../Data/2017_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2018 <- read.csv("../Data/2018_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2019 <- read.csv("../Data/2019_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2020 <- read.csv("../Data/2020_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2021 <- read.csv("../Data/2021_Building_Energy_Benchmarking.csv", header = TRUE)
+Benchmarking2022 <- read.csv("../Data/2022_Building_Energy_Benchmarking.csv", header = TRUE)
+
+```
+
+# Data Cleaning
+
+```{r Identifying Missing Values, echo=FALSE}
+
+# Summarise each column to count the number of NA values - PSE Data
+missing_summary_PSE <- pse_data %>%
+  st_set_geometry(NULL) %>% 
+  summarise(across(everything(), ~sum(is.na(.)))) %>% 
+  gather(key = "column", value = "missing_values")
+print(missing_summary_PSE)
+
+# Summarise each column to count the number of NA values - Equity Data
+missing_summary_Equity <- equity_data %>%
+  st_set_geometry(NULL) %>% 
+  summarise(across(everything(), ~sum(is.na(.)))) %>% 
+  gather(key = "column", value = "missing_values")
+print(missing_summary_Equity)
+
+
+
+```
+
+
+There are no missing values in our equity data, but Puget Sound Energy (PSE) data does have missing values. Reading the description of the PSE data, the missing attributes is due to 'grouped flag' not being filtered to true. This flag indicates data aggregation across multiple census tracts to preserve privacy, reflecting broader trends without risking the identification of individual tracts. Entries with the 'grouped flag' set to false may have values of 0, signifying no or insufficient data for aggregation. 
+
+
+```{r Handling Missing Values, echo=FALSE}
+
+# Filter the PSE data for the Grouped_Flag to TRUE
+pse_data_clean <- subset(pse_data, Grouped_Fl=='TRUE')
+
+# Summarise each column to count the number of NA values - PSE Data
+missing_summary_PSE_clean <- pse_data_clean %>%
+  st_set_geometry(NULL) %>% 
+  summarise(across(everything(), ~sum(is.na(.)))) %>% 
+  gather(key = "column", value = "missing_values")
+print(missing_summary_PSE_clean)
+
+#Building Performance Data
+#For 2017 specifically there are 2 columns that were giving us issues for data cleaning immediately.
+
+#Other than 2017 we are just omitting files that have na values
+data2017 <- select(data2017, -c(Low.Outlier.Cutoff, High.Outlier.Cutoff))
+data2022 <- na.omit(data2022)
+data2021 <- na.omit(data2021)
+data2020 <- na.omit(data2020)
+data2019 <- na.omit(data2019)
+data2018 <- na.omit(data2018)
+data2017 <- na.omit(data2017)
+data2016 <- na.omit(data2016)
+
+
+#Benchmarking Data
+#Removing columns that are not available for year over year analysis
+Bench2016 <- subset(Benchmarking2016, select = -c(Comments,Outlier,DefaultData) )
+Bench2017 <- subset(Benchmarking2017, select = -c(Outlier,DefaultData) )
+Bench2018 <- subset(Benchmarking2018, select = -c(Compliance.Issue, EPA.Building.Sub.Type.Name) )
+Bench2019 <- subset(Benchmarking2019, select = -c(ComplianceIssue) )
+Bench2020 <- subset(Benchmarking2020, select = -c(ComplianceIssue) )
+Bench2021 <- subset(Benchmarking2021, select = -c(ComplianceIssue) )
+Bench2022 <- subset(Benchmarking2022, select = -c(ComplianceIssue) )
+
+#Inserting columns of NULL values for years without all variable measurements, makes it easier to remove as a whole later
+Bench2018['TaxParcelIdentificationNumber'] <- NA
+Bench2018['NumberofBuildings'] <- NA
+Bench2018['YearsENERGYSTARCertified'] <- NA
+Bench2018['ListOfAllPropertyUseTypes'] <- NA
+Bench2019['YearsENERGYSTARCertified'] <- NA
+Bench2019['NumberofBuildings'] <- NA
+Bench2019['ListOfAllPropertyUseTypes'] <- NA
+Bench2020['YearsENERGYSTARCertified'] <- NA
+Bench2020['ListOfAllPropertyUseTypes'] <- NA
+Bench2021['YearsENERGYSTARCertified'] <- NA
+Bench2021['ListOfAllPropertyUseTypes'] <- NA
+Bench2022['YearsENERGYSTARCertified'] <- NA
+Bench2022['ListOfAllPropertyUseTypes'] <- NA
+
+#After columns renamed so that data can be merged, then we will take care of null values
+```
+We no longer have any missing values in our PSE data.
+
+Building Performance Data: To get rid of NA values in the data set we used the command na.omit. When using na.omit, it removes every row that has an NA value. There is a data set for each year from 2016 to 2022. The 2017 data is the only data set that has columns named Low/High Outlier cutoff, and for those columns almost every single row has an NA value. Therefore, we would have been only left with 3 rows for the whole 2017 dataset. Because of that, we deemed these columns unnecessary and removed them from the 2017 dataset. For the rest of the data sets as well as the 2017 data set, omitting NA values allows for cleaner exploratory data analysis now even though we may revisit with these rows in the future.
+
+
+Benchmarking Data: The Benchmark Energy by Individual Building data was very inconsistent. To address this, we added columns of NA values to the years that did not have all of the variables that the other years. Next, we organized the variables for all years so that they matched. Then we removed the columns of data with too many null values to be useful for analysis. Lastly, we bound the years of data together into one data set.
+
+
+```{r Converting and Manipulating Character Data, echo=FALSE}
+
+# Ensure the GEOID and Census_Tract columns are of the same type before merging
+pse_data_clean$Census_Tra <- as.character(pse_data_clean$Census_Tra)
+equity_data$GEOID <- as.character(equity_data$GEOID)
+
+# Convert to regular dataframes for the merge operation, and drop geometry column from equity_data
+pse_data_df <- as.data.frame(pse_data_clean)
+equity_data_df <- as.data.frame(equity_data %>% st_set_geometry(NULL))
+
+# Renaming Columns for Clarity in pse_data_df
+pse_data_df <- pse_data_df %>% 
+  rename(
+    Grouped_Flag = Grouped_Fl, 
+    Usage_MMBTU = Usage_MMBT, 
+    Number_Accts = Number_Acc, 
+    Emissions_MTCO2E = Emissions_, 
+    USAGEPERCAPITA_MMBTU = USAGEPERCA, 
+    EMISSIONSPERCAPITA_MTCO2E = EMISSIONSP, 
+    RSE_Quintile = RSE_Quinti, 
+    SHAPE_Length = SHAPE_Leng
+  )
+
+# Standardizing Quintile Labels in pse_data_df
+pse_data_df$RSE_Quintile <- replace(pse_data_df$RSE_Quintile, pse_data_df$RSE_Quintile == 'Highest priority/Most disadvantaged', 'Highest')
+
+
+# Creating a Subset of Relevant Columns in equity_data_df
+equity_data_df <- subset(equity_data_df, select = c(OBJECTID, GEOID, SHAPE_Leng, SHAPE_Area, RACE_ELL_1, SOCIOECO_2, HEALTH_D_1, COMPOSIT_1))
+
+# Renaming Columns for Clarity in equity_data_df
+equity_data_df <- equity_data_df %>% 
+  rename(
+    SHAPE_Length = SHAPE_Leng, 
+    RACE_ELL_ORIGINS_QUINTILE = RACE_ELL_1, 
+    SOCIOECON_DISADV_QUINTILE = SOCIOECO_2, 
+    HEALTH_DISADV_QUINTILE = HEALTH_D_1, 
+    COMPOSITE_QUINTILE = COMPOSIT_1
+  )
+
+
+# Standardizing Quintile Labels in equity_data_df
+equity_data_df[equity_data_df == 'Highest Equity Priority' | equity_data_df == 'Highest Equity Priority/Most Disadvantaged' | equity_data_df == 'Highest priority/Most disadvantaged'] <- 'Highest'
+
+
+
+#Benchmarking Data
+#Variable renaming for consistency year over year
+#In 2018, most columns needing to be renamed in order to match other years in order to combine data
+names(Bench2018)[1] <- "OSEBuildingID"
+names(Bench2018)[2] <- "DataYear"
+names(Bench2018)[3] <- "PropertyName"
+names(Bench2018)[4] <- "BuildingType"
+names(Bench2018)[8] <- "ZipCode"
+names(Bench2018)[12] <- "CouncilDistrictCode"
+names(Bench2018)[13] <- "YearBuilt"
+names(Bench2018)[14] <- "NumberofFloors"
+names(Bench2018)[15] <- "PropertyGFATotal"
+names(Bench2018)[17] <- "PropertyGFAParking"
+names(Bench2018)[18] <- "PrimaryPropertyType"
+names(Bench2018)[19] <- "ENERGYSTARScore"
+names(Bench2018)[26] <- "LargestPropertyUseType"
+names(Bench2018)[27] <- "LargestPropertyUseTypeGFA"
+names(Bench2018)[28] <- "SecondLargestPropertyUseType"
+names(Bench2018)[29] <- "SecondLargestPropertyUseTypeGFA"
+names(Bench2018)[30] <- "ThirdLargestPropertyUseType"
+names(Bench2018)[31] <- "ThirdLargestPropertyUseTypeGFA"
+names(Bench2018)[35] <- "ComplianceStatus"
+names(Bench2018)[38] <- "GHGEmissionsIntensity"
+names(Bench2018)[39] <- "TotalGHGEmissions"
+names(Bench2019)[3] <- "PropertyName"
+names(Bench2020)[3] <- "PropertyName"
+names(Bench2020)[27] <- "PrimaryPropertyType"
+names(Bench2021)[3] <- "PropertyName"
+names(Bench2021)[27] <- "PrimaryPropertyType"
+names(Bench2022)[3] <- "PropertyName"
+names(Bench2022)[27] <- "PrimaryPropertyType"
+
+
+#Specifying the order of the columns to rearrange variables into
+col_order <- c("OSEBuildingID", "DataYear", "BuildingType", "PrimaryPropertyType",
+               "PropertyName", "Address", "City", "State",
+               "ZipCode", "TaxParcelIdentificationNumber", "CouncilDistrictCode", "Neighborhood",
+               "Latitude", "Longitude", "YearBuilt", "NumberofBuildings",
+               "NumberofFloors", "PropertyGFATotal", "PropertyGFAParking", "PropertyGFABuilding.s.",
+               "ListOfAllPropertyUseTypes", "LargestPropertyUseType", "LargestPropertyUseTypeGFA", "SecondLargestPropertyUseType",
+               "SecondLargestPropertyUseTypeGFA", "ThirdLargestPropertyUseType", "ThirdLargestPropertyUseTypeGFA", "YearsENERGYSTARCertified",
+               "ENERGYSTARScore", "SiteEUI.kBtu.sf.", "SiteEUIWN.kBtu.sf.", "SourceEUI.kBtu.sf.",
+               "SourceEUIWN.kBtu.sf.", "SiteEnergyUse.kBtu.", "SiteEnergyUseWN.kBtu.", "SteamUse.kBtu.",
+               "Electricity.kWh.", "Electricity.kBtu.", "NaturalGas.therms.", "NaturalGas.kBtu.",
+               "ComplianceStatus", "TotalGHGEmissions", "GHGEmissionsIntensity")
+
+
+#Applying column order
+Bench2016 <- Bench2016[,col_order]
+Bench2017 <- Bench2017[,col_order]
+Bench2018 <- Bench2018[,col_order]
+Bench2019 <- Bench2019[,col_order]
+Bench2020 <- Bench2020[,col_order]
+Bench2021 <- Bench2021[,col_order]
+Bench2022 <- Bench2022[,col_order]
+
+#Binding data years together
+Bound2016_17 <- rbind(Bench2016, Bench2017)
+Bound2016_18 <- rbind(Bench2016, Bench2018)
+Bound2016_19 <- rbind(Bench2016, Bench2019)
+Bound2016_20 <- rbind(Bench2016, Bench2020)
+Bound2016_21 <- rbind(Bench2016, Bench2021)
+Bench2016_22 <- rbind(Bench2016, Bench2022)
+
+#Now that data is merged we can take care of null values as a whole
+
+#Removing variables that won't be able to be used (too many NULLs)
+Bench_cleaned = subset(Bench2016_22, select = -c(ListOfAllPropertyUseTypes, SecondLargestPropertyUseType, SecondLargestPropertyUseTypeGFA, ThirdLargestPropertyUseType, ThirdLargestPropertyUseTypeGFA, YearsENERGYSTARCertified, ENERGYSTARScore, SteamUse.kBtu., NaturalGas.therms., NaturalGas.kBtu.) )
+
+#Looking for NULL values and 
+null_counts <- colSums(is.na(Bench_cleaned))
+null_counts
+summary(Bench_cleaned)
+```
+
+Benchmarking Data: After merging data into one file using rbind by year, we then removed the null values. This included columns that had too many null values for use, and probably would not have been of use anyways.
+
+
+```{r}
+#Substituting in mean values for NULLs
+Bench_cleaned <- Bench_cleaned %>% mutate(NumberofBuildings = ifelse(is.na(NumberofBuildings), 1.122, NumberofBuildings))
+Bench_cleaned <- Bench_cleaned %>% mutate(LargestPropertyUseTypeGFA = ifelse(is.na(LargestPropertyUseTypeGFA), 82861, LargestPropertyUseTypeGFA))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUI.kBtu.sf. = ifelse(is.na(SiteEUI.kBtu.sf.), 53.61, SiteEUI.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEUIWN.kBtu.sf. = ifelse(is.na(SiteEUIWN.kBtu.sf.), 54.20, SiteEUIWN.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SourceEUI.kBtu.sf. = ifelse(is.na(SourceEUI.kBtu.sf.), 125.1, SourceEUI.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SourceEUIWN.kBtu.sf. = ifelse(is.na(SourceEUIWN.kBtu.sf.), 125.9, SourceEUIWN.kBtu.sf.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEnergyUse.kBtu. = ifelse(is.na(SiteEnergyUse.kBtu.), 5589121, SiteEnergyUse.kBtu.))
+Bench_cleaned <- Bench_cleaned %>% mutate(SiteEnergyUseWN.kBtu. = ifelse(is.na(SiteEnergyUseWN.kBtu.), 5434499, SiteEnergyUseWN.kBtu.))
+Bench_cleaned <- Bench_cleaned %>% mutate(Electricity.kWh. = ifelse(is.na(Electricity.kWh.), 1065563, Electricity.kWh.))
+Bench_cleaned <- Bench_cleaned %>% mutate(Electricity.kBtu. = ifelse(is.na(Electricity.kBtu.), 3635701, Electricity.kBtu.))
+Bench_cleaned <- Bench_cleaned %>% mutate(TotalGHGEmissions = ifelse(is.na(TotalGHGEmissions), 120.06, TotalGHGEmissions))
+Bench_cleaned <- Bench_cleaned %>% mutate(GHGEmissionsIntensity = ifelse(is.na(GHGEmissionsIntensity), 1.111, GHGEmissionsIntensity))
+
+#Last of group NULL value address for Benchmarking data
+```
+
+Benchmarking Data: Substituted in mean values taken from summary data to replace NULL values for numerical columns. Not logical to replace the mean for categorical variables.
+
+```{r Ensuring Data Integrity, echo=FALSE}
+
+# Merging the PSE data with the equity data on GEOID/Census_Tract
+merged_data_df <- inner_join(pse_data_df, equity_data_df, by = c("Census_Tra" = "GEOID"))
+
+# Reattach the geometry to merged_data_df
+geometry_col <- pse_data_clean %>% 
+  select(Census_Tra, geometry) %>% 
+  distinct(Census_Tra, .keep_all = TRUE)
+
+# Join this geometry data back to the merged dataframe
+GIS_EE <- merged_data_df %>%
+  left_join(geometry_col, by = "Census_Tra") %>%
+  st_as_sf(crs = st_crs(pse_data_clean))
+
+
+#Building Performance Data
+
+#We are renaming all the columns names for all the years so they are all uniform so we can join them later. The order does not matter right now, we are going with the order of how they are in their respective files.
+
+colnames(data2016) <- c("BuildingType", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Number_of_Buildings", "Total_GFA", "Median_GFA", "Median_Year_Built", "Percent_Electricity", "Percent_Gas", "Percent_Steam", "Percent_Other_Fuel")
+
+colnames(data2017) <- c("BuildingType", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Number_of_Buildings", "Number_of_Buildings_with_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Percent_Electricity", "Percent_Gas", "Percent_Steam", "Percent_Other_Fuel")
+
+colnames(data2018) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_EUI", "Median_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Not applies")
+
+colnames(data2019) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2020) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2021) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+colnames(data2022) <- c("BuildingType", "Number_of_Buildings", "Percentile_25th_EUI", "Median_EUI", "Percentile_75th_EUI", "Median_EUI_WN", "Average_Site_EUI", "Average_Site_EUI_WN", "Median_Source_EUI", "Median_ES_Score", "Average_ES_Score", "Total_GFA", "Median_GFA", "Median_Year_Built", "Average_GHGSF", "MedianGHGSF")
+
+#we are doign 3 checks to see if every column in every year is in 2022, 2016 and 2018 respecitvely as I was having issues with incompatible dataset before
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2022)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2022)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2022)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2022)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2022)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2022)]
+
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2016)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2016)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2016)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2016)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2016)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2016)]
+data2022 <- data2022[, colnames(data2022) %in% colnames(data2016)]
+
+data2016 <- data2016[, colnames(data2016) %in% colnames(data2018)]
+data2017 <- data2017[, colnames(data2017) %in% colnames(data2018)]
+data2018 <- data2018[, colnames(data2018) %in% colnames(data2018)]
+data2019 <- data2019[, colnames(data2019) %in% colnames(data2018)]
+data2020 <- data2020[, colnames(data2020) %in% colnames(data2018)]
+data2021 <- data2021[, colnames(data2021) %in% colnames(data2018)]
+data2022 <- data2022[, colnames(data2022) %in% colnames(data2018)]
+
+#we are adding a year column to every dataset 
+library(dplyr)
+data2022 <- mutate(data2022, Year = 2022)
+data2021 <- mutate(data2021, Year = 2021)
+data2020 <- mutate(data2020, Year = 2020)
+data2019 <- mutate(data2019, Year = 2019)
+data2018 <- mutate(data2018, Year = 2018)
+data2017 <- mutate(data2017, Year = 2017)
+data2016 <- mutate(data2016, Year = 2016)
+
+#we are now going to combine all our datasets
+combined_data <- bind_rows(
+  mutate(data2016, Year = 2016),
+  mutate(data2017, Year = 2017),
+  mutate(data2018, Year = 2018),
+  mutate(data2019, Year = 2019),
+  mutate(data2020, Year = 2020),
+  mutate(data2021, Year = 2021),
+  mutate(data2022, Year = 2022)
+)
+
+combined_data<- combined_data[combined_data$BuildingType != "Citywide", ]
+
+# Benchmarking Data
+#Checking that NULLs have actually changed
+summary(Bench_cleaned)
+```
+
+We are renaming columns so they are all a uniform name. Then we are checking to see if all columns fit in the specific years (2022, 2016, 2018) to make sure all our data is uniform. We are then adding a year column and combining the data based on the rows. Then after that we are omitting the Citywide data because it is a major outlier and not a building type we are interested in.
+
+```{r Special Coding for Numerical Data (Binning, etc.), echo=FALSE}
+
+# Encoding quantiles into numeric values for GIS_EE_encoded
+GIS_EE_encoded <- GIS_EE
+
+# Encode quintile values into numeric
+GIS_EE_encoded$COMPOSITE_QUINTILE <- ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Highest", 5, ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Second Highest", 4, ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Middle", 3, ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Second Lowest", 2, ifelse(GIS_EE_encoded$COMPOSITE_QUINTILE == "Lowest", 1, GIS_EE_encoded$COMPOSITE_QUINTILE)))))
+
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Highest", 5, ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Second Highest", 4, ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Middle", 3, ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Second Lowest", 2, ifelse(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE == "Lowest", 1, GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)))))
+
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Highest", 5, ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Second Highest", 4, ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Middle", 3, ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Second Lowest", 2, ifelse(GIS_EE_encoded$HEALTH_DISADV_QUINTILE == "Lowest", 1, GIS_EE_encoded$HEALTH_DISADV_QUINTILE)))))
+
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Highest", 5, ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Second Highest", 4, ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Middle", 3, ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Second Lowest", 2, ifelse(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE == "Lowest", 1, GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)))))
+
+# Convert encoded quintiles to numeric
+GIS_EE_encoded$COMPOSITE_QUINTILE <- as.numeric(GIS_EE_encoded$COMPOSITE_QUINTILE)
+GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE <- as.numeric(GIS_EE_encoded$RACE_ELL_ORIGINS_QUINTILE)
+GIS_EE_encoded$HEALTH_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$HEALTH_DISADV_QUINTILE)
+GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE <- as.numeric(GIS_EE_encoded$SOCIOECON_DISADV_QUINTILE)
+
+
+#Benchmarking Data
+#Created a separate data set with just numerical columns so that we can better perform EDA while keeping categorical variables intact
+Bench_numerical <- select(Bench_cleaned, "CouncilDistrictCode", "YearBuilt", "NumberofBuildings", "NumberofFloors", "PropertyGFATotal", "PropertyGFAParking", "PropertyGFABuilding.s.", "SiteEUI.kBtu.sf.", "SiteEUIWN.kBtu.sf.", "SourceEUI.kBtu.sf.", "SourceEUIWN.kBtu.sf.", "SiteEnergyUse.kBtu.", "SiteEnergyUseWN.kBtu.", "Electricity.kWh.", "Electricity.kBtu.", "TotalGHGEmissions", "GHGEmissionsIntensity")
+```
+
+Below, we identified outliers within the energy metrics from the merged dataset of Puget Sound Energy (PSE) and equity data. This step will help us uncover any significant deviations in energy consumption and efficiency, which will inform our understanding of disparities.
+
+```{r Identifying Outliers}
+
+# Function to identify and summarize outliers in a column
+summarize_outliers <- function(data, column_name) {
+  attribute_data <- data[[column_name]]
+  
+  # Calculate IQR
+  Q1 <- quantile(attribute_data, 0.25, na.rm = TRUE)
+  Q3 <- quantile(attribute_data, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  
+  # Identify outliers
+  outliers_logical <- attribute_data < (Q1 - 1.5 * IQR) | attribute_data > (Q3 + 1.5 * IQR)
+  outlier_values <- attribute_data[outliers_logical]
+
+  # Calculating the minimum and maximum outlier values
+  min_outlier_value <- if(length(outlier_values) > 0) min(outlier_values, na.rm = TRUE) else NA
+  max_outlier_value <- if(length(outlier_values) > 0) max(outlier_values, na.rm = TRUE) else NA
+  
+  # Basic statistics
+  basic_stats <- summary(attribute_data)
+  
+  # Summarize outliers
+  num_outliers <- sum(outliers_logical, na.rm = TRUE)
+  
+  return(list(
+    column = column_name,
+    num_outliers = num_outliers,
+    min_outlier_value = min_outlier_value,
+    max_outlier_value = max_outlier_value,
+    basic_stats = basic_stats
+  ))
+}
+
+# Columns to check for outliers and summarize
+columns_to_check <- c("EMISSIONSPERCAPITA_MTCO2E", "Usage_MMBTU", "Emissions_MTCO2E", "Number_Accts")
+
+# Initialize an empty list to store summaries
+outlier_summaries <- list()
+
+# Summarize outliers for each column and store the results
+for(column in columns_to_check) {
+  outlier_summaries[[column]] <- summarize_outliers(GIS_EE_encoded, column)
+}
+
+# Print summaries for each column
+for(column in columns_to_check) {
+  summary <- outlier_summaries[[column]]
+  cat("Summary for", summary$column, ":\n")
+  cat("Number of outliers:", summary$num_outliers, "\n")
+  cat("Minimum outlier value:", summary$min_outlier_value, "\n")
+  cat("Maximum outlier value:", summary$max_outlier_value, "\n")
+  cat("Basic Statistics: \n")
+  print(summary$basic_stats)
+  cat("\n")
+}
+
+```
+
+In the PSE and equity data cleaning process, we prioritized data integrity, ensuring the accuracy and consistency of our datasets throughout their lifecycle. This process began with the crucial step of renaming columns to enhance clarity and consistency, thereby making the datasets more intuitive for analysis.
+
+Type Checking and Format Alignment: We checked data types across all columns, ensuring numeric and categorical data were correctly identified. This step included verifying that numeric columns were accurately typed as integers, and categorical data was appropriately classified. For spatial data integrity, particularly in the conversion back to an sf object, we maintained a strict adherence to ensuring that the coordinate reference system (CRS) was consistently defined, preserving the spatial accuracy essential for geographic analyses.
+
+Data Completeness and Reliability: A comprehensive review for null values was conducted to confirm the completeness of our datasets. By streamlining equity_data_df, we selected only the most pertinent columns related to identifiers, location, and quintile scores across various equity dimensions. The renaming of these columns further contributed to the dataset's clarity.
+
+Standardization for Comparative Analysis: The standardization of quintile labels for the RSE_Quintile column and similar labels across all metrics aligned our datasets with uniform terminology, and comparative analysis across different metrics. This uniformity is especially crucial when merging attributes from equity_data into pse_data, based on matching geographic identifiers.
+
+Ensuring Spatial and Analytical Bounds: Our process included rigorous checks to ensure that all geometries fell within expected geographical boundaries.
+
+Data Merging and Integrity: The inner_join operation, based on matching identifiers between pse_data_df and equity_data_df, was performed to merge relevant attributes. This step was critical in combining datasets without compromising data integrity, avoiding the introduction of duplicate rows or inaccuracies. The conversion of the merged dataframe back into an sf object, ensured the dataset remained conducive to detailed spatial analysis.
+
+# Data Management
+
+In our project, we've implemented a streamlined collaborative workflow on GitLab, focusing on minimizing collaboration errors through effective data management strategies. Each team member initiates their work in a dedicated branch. This allows for isolated development without impacting the main codebase. Regular commits are made within these branches using `git add .` and `git commit -m "description"`.
+
+Before we start any work in our individual branch, first we update our branch with the main branch, using `git pull origin main`. This streamlines our development process, and also enforces a disciplined data management practice that minimizes errors and fosters efficient collaboration among team members.
+
+# GIS Exploratory Data Analysis
+
+In order to build a comprehensive GIS (Geographic Information System) analysis to visually represent energy usage patterns and emissions across different types of buildings in Seattle, we will use the following attributes below from our final merged data. 
+
+Usage_MMBTU (Gas Consumption): Analyzing gas consumption measured in MMBtu across different buildings can help identify high energy usage patterns. This will help identify which areas or types of buildings consume more energy, potentially indicating areas where energy efficiency measures could be most effective.
+
+Number_Accts (Number of User Accounts): This attribute can provide insights into the density of energy consumers in different areas. When visualized spatially, it can help distinguish between areas with high consumer density versus areas with significant energy usage but fewer accounts, possibly indicating commercial or industrial buildings with high energy demand.
+
+Emissions_MTCO2E (Emissions from Gas Usage): Mapping emissions resulting from gas usage offers a direct visualization of the environmental impact associated with energy consumption in different areas. This analysis is crucial for identifying regions with higher emissions where interventions for cleaner energy use could have a significant environmental benefit.
+
+USAGEPERCAPITA_MMBTU (Gas Usage Per Account): By calculating gas usage per account, we can assess energy efficiency at a more granular level. This metric helps identify buildings or sectors where energy use is disproportionately high relative to the number of accounts, highlighting targets for energy conservation measures or for the transition to cleaner energy sources.
+
+EMISSIONSPERCAPITA_MTCO2E (Emissions Per Account): Similar to USAGEPERCAPITA_MMBTU, analyzing emissions per account provides insights into the carbon footprint of energy consumption on a per-account basis. This can help target specific buildings or sectors for emission reduction initiatives.
+
+
+```{r Analyzing Data Over Time}
+
+# Function to create a ggplot for the trend of a given attribute over years
+plotTrendOverYears <- function(data, attribute, attributeName, title) {
+  ggplot(data, aes(x = CAL_YEAR, y = .data[[attribute]])) +
+    geom_line() +
+    geom_point() +
+    theme_minimal() +
+    labs(title = title, x = "Calendar Year", y = attributeName)
+}
+
+# Plotting the trends with renamed attributes
+plotTrendOverYears(GIS_EE_encoded, "Usage_MMBTU", "Gas Consumption (MMBTU)", "Trend of Gas Consumption Over Years")
+plotTrendOverYears(GIS_EE_encoded, "Number_Accts", "Number of Accounts", "Trend of Number of Accounts Over Years")
+plotTrendOverYears(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions (MTCO2E)", "Trend of Emissions Over Years")
+plotTrendOverYears(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita (MMBTU)", "Trend of Usage Per Capita Over Years")
+plotTrendOverYears(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita (MTCO2E)", "Trend of Emissions Per Capita Over Years")
+
+
+
+```
+
+We explore energy usage and emissions from 2020 to 2023 and compare it among various sectors (building types). 
+
+Trend of Gas Consumption Over Years: The scale is dominated by these outliers, which could mask underlying trends.
+
+Trend of Number of Accounts Over Years: The number of accounts appears to increase over time, with a particular spike noted in 2022 This could be due to an increase in the customer base or changes in data collection. However, a drop back to previous levels suggests a possible correction or a one-time event.
+
+Trend of Emissions Over Years: Similar to the gas consumption graph, also exhibit sharp peaks. This suggests that high gas consumption is directly linked to increased emissions, highlighting specific points in time where emissions reduction efforts might be focused.
+
+Trend of Usage Per Capita Over Years: The per capita usage shows that there may be fluctuations in usage efficiency or changes in the number of accounts relative to consumption. Such variations warrant a closer look to understand the driving factors behind the increased per capita consumption.
+
+Trend of Emissions Per Capita Over Years: Emissions per capita follows a similar pattern to the other metrics, with notable peaks that stand out. These could indicate years where emission reduction measures were less effective or where consumption was unusually high.
+
+We will take a closer look by analyzing the distribution of attributes for each sector individually. 
+
+```{r Plot Distributions of Key Variables}
+
+# Function to create individual boxplots for a given attribute across years, for each sector
+createBoxplotsBySector <- function(data, attribute, title_suffix) {
+  # Determine the y-axis label based on the attribute
+  yAxisLabel <- switch(attribute,
+                       EMISSIONSPERCAPITA_MTCO2E = "Emissions Per Capita (MTCO2E)",
+                       Usage_MMBTU = "Gas Consumption (MMBTU)",
+                       Number_Accts = "Number of Accounts",
+                       Emissions_MTCO2E = "Emissions (MTCO2E)",
+                       USAGEPERCAPITA_MMBTU = "Usage Per Capita (MMBTU)")
+  
+  ggplot(data, aes(x = as.factor(CAL_YEAR), y = .data[[attribute]])) +
+    geom_boxplot(aes(fill = Sector)) +
+    facet_wrap(~Sector, scales = "free_y") +
+    theme_minimal() +
+    labs(title = paste("Annual", title_suffix, "by Sector"),
+         x = "Calendar Year", y = yAxisLabel) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+}
+
+# Adjust the function calls with the correct title suffixes
+createBoxplotsBySector(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita")
+createBoxplotsBySector(GIS_EE_encoded, "Usage_MMBTU", "Gas Consumption")
+createBoxplotsBySector(GIS_EE_encoded, "Number_Accts", "Number of Accounts")
+createBoxplotsBySector(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions")
+createBoxplotsBySector(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Gas Usage Per Account")
+
+```
+
+Above, are boxplots that focus closely on the sectors, allowing us to interpret the data for Commercial, Industrial, and Residential building types. However, the Industrial sector still presents challenges in interpretation, aside from the evident potential outliers in some industrial buildings.
+
+Annual Usage Per Capita by Sector: For the commercial sector, the distribution of usage per capita is relatively consistent across the years. The industrial sector again stands out with significant outliers, indicating a few accounts with extremely high gas usage per capita. Residential usage per capita is lower, suggesting either higher energy efficiency or less intensive energy use in the residential sector.
+
+Annual Emissions by Sector: The commercial sector has a relatively stable range with some outliers. The industrial sector's emissions data feature a very low median and interquartile range with the presence of significant outliers, which highlights a few industrial facilities with exceptionally high emissions. The residential sector's emissions are more consistent, lacking any extreme outliers.
+
+Annual Number of Accounts by Sector: The commercial sector displays a steady number of accounts with little variation. In contrast, the industrial sector has a lower median value but a wide range of accounts, reflecting a diverse industrial base. The residential sector shows higher values, indicating a greater number of accounts, which is expected given the prevalence of residential buildings.
+
+Annual Emissions Per Capita by Sector: The commercial sector's emissions per capita are moderate but with several outliers indicating a few instances of disproportionately high emissions. The industrial sector's boxplots are compressed at the bottom of the scale, which alongside numerous extreme outliers, suggests a few highly emitting industrial operations relative to the number of accounts. The residential sector shows less variation in emissions per capita over the years and a relatively tighter interquartile range, indicating more uniformity in residential emissions.
+
+Annual Gas Consumption by Sector: The commercial sector shows a consistent range of consumption with some outliers suggesting occasional spikes in gas usage. The industrial sector exhibits a wide variance, indicating substantial differences in gas consumption patterns within this sector. Residential consumption appears to be lower and more consistent compared to the commercial sector. The industrial sector has extreme outliers that might warrant further investigation to understand the underlying causes of such high consumption values.
+
+
+```{r Key Metrics/Measurements/Statistics}
+
+# Identify all unique sectors in the dataset
+unique_sectors <- unique(GIS_EE_encoded$Sector)
+
+# Iterate over each sector to filter data and print summary statistics
+for(sector in unique_sectors) {
+  cat("Summary statistics for sector:", sector, "\n")
+  
+  # Filter the dataset for the current sector
+  sector_data <- GIS_EE_encoded %>% 
+    filter(Sector == sector)
+  
+  # Get a summary to see the range and quartiles for EMISSIONSPERCAPITA_MTCO2E
+  summary_stats <- summary(sector_data$EMISSIONSPERCAPITA_MTCO2E)
+  
+  print(summary_stats)
+  cat("\n")
+}
+
+```
+
+
+The industrial sector stands out significantly due to its high mean and maximum values, indicating that a few industrial entities have substantially higher measurements than the rest, which could skew the sector's overall data profile. The commercial sector shows a more stable and predictable range of values with a distribution that is not heavily skewed by outliers. The residential sector shows the most consistency and uniformity in its values, suggesting similar energy profiles across different residential entities.
+
+The extreme values in the industrial sector requiere further investigation.
+
+
+```{r Comparison Across Categories}
+
+# Function to create a ggplot for yearly trends of a given attribute, grouped by sector
+createYearlyTrendPlot <- function(data, attribute, attributeName, title_prefix) {
+  ggplot(data) +
+    geom_line(aes(x = CAL_YEAR, y = .data[[attribute]], color = Sector), size = 1) +
+    geom_point(aes(x = CAL_YEAR, y = .data[[attribute]], color = Sector)) +
+    facet_wrap(~Sector, scales = "free_y") +
+    theme_minimal() +
+    labs(title = paste(title_prefix, "Yearly Trend by Sector"),
+         x = "Calendar Year",
+         y = attributeName) +
+    theme(legend.position = "bottom")
+}
+
+# Plotting the trends with renamed attributes
+createYearlyTrendPlot(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "Emissions Per Capita (MTCO2E)", "Emissions Per Capita")
+createYearlyTrendPlot(GIS_EE_encoded, "Usage_MMBTU", "Gas Consumption (MMBTU)", "Gas Consumption")
+createYearlyTrendPlot(GIS_EE_encoded, "Number_Accts", "Number of Accounts", "Number of Accounts")
+createYearlyTrendPlot(GIS_EE_encoded, "Emissions_MTCO2E", "Emissions (MTCO2E)", "Emissions")
+createYearlyTrendPlot(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "Usage Per Capita (MMBTU)", "Usage Per Capita")
+
+
+```
+
+Above, we employ a facet wrap to visualize the yearly trend for each sector. These visualizations will help us understand how energy usage and emissions have changed over time and how these changes vary across different building sectors.
+
+Emissions Per Capita Yearly Trend by Sector: Industrial emissions per capita have extreme values in some years, indicating significant variability within this sector. Both commercial and residential sectors show less variability but note that the scale differences across graphs may make comparisons challenging.
+
+Gas Consumption Yearly Trend by Sector: The industrial sector shows extreme gas consumption values, which could be due to large-scale industrial activities or data reporting errors. The commercial and residential sectors show a steady trend without such extremes.
+
+Number of Accounts Yearly Trend by Sector: The residential sector exhibits a spike in the number of accounts in one year, then a return to previous levels. The commercial and industrial sectors show less dramatic changes.
+
+Emissions Yearly Trend by Sector: Industrial emissions demonstrate extreme peaks, mirroring the trend in gas consumption and emissions per capita, suggesting that certain industrial activities are major contributors to overall emissions.
+Commercial and residential sectors show a more stable trend, but the residential sector shows some variability in recent years.
+
+Usage Per Capita Yearly Trend by Sector: The industrial sector's usage per capita also includes outliers, reflecting the extreme values in other metrics. The commercial sector shows an increasing trend in recent years, and the residential sector exhibits variability.
+
+Summary of all metrics: The commercial sector shows some outliers but generally has a more predictable range of values, suggesting that while there are peaks in consumption and emissions, they are not as pronounced as in the industrial sector.
+Residential metrics are generally more tightly grouped, indicating less variability between accounts in this sector.
+The presence of outliers in the industrial sector, may indicate potential targets for interventions to reduce consumption and emissions. These outliers requiere further investigation.
+
+
+```{r Pattern Identification and Interpretation, echo=FALSE}
+
+# Function to create an interactive map for a given data column
+createInteractiveMap <- function(data, column_name, colorPalette = "viridis", title = "") {
+  # Determine the color palette
+  palette <- colorNumeric(palette = colorPalette, domain = data[[column_name]])
+  
+  # Create the map
+  leaflet(data) %>%
+    addTiles() %>%
+    addPolygons(color = ~palette(data[[column_name]]),
+                fillOpacity = 0.5,
+                popup = ~paste(title, ":", data[[column_name]])) %>%
+    addLegend("bottomright", pal = palette, values = data[[column_name]],
+              title = title,
+              labFormat = labelFormat(),
+              opacity = 1)
+}
+createInteractiveMap(GIS_EE_encoded, "EMISSIONSPERCAPITA_MTCO2E", "viridis", "Emissions Per Capita")
+createInteractiveMap(GIS_EE_encoded, "Usage_MMBTU", "viridis", "Gas Consumption")
+createInteractiveMap(GIS_EE_encoded, "Number_Accts", "viridis", "Number of Accounts")
+createInteractiveMap(GIS_EE_encoded, "Emissions_MTCO2E", "viridis", "Emissions from Gas usage")
+createInteractiveMap(GIS_EE_encoded, "USAGEPERCAPITA_MMBTU", "viridis", "Gas Usage Per Capita")
+
+```
+
+
+We aimed to generate geographic plots to visualize the distribution of our data points across Seattle. It appears that some energy data was omitted during the inner join. Below, we will graph the energy data before it was merged with the equity data. This omission could be due to mismatches between GEOID and Census Tract identifiers, raising questions about the extent of additional data available when examining only the energy data.
+
+
+```{r Analysis of Outliers/Anomalies, echo=FALSE}
+
+# EMISSIONSP
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(
+    color = ~colorNumeric("viridis", EMISSIONSP)(EMISSIONSP),
+    fillOpacity = 0.5,
+    popup = ~paste("Emissions Per Capita:", EMISSIONSP)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$EMISSIONSP), 
+    values = ~EMISSIONSP,
+    title = "Emissions Per Capita",
+    position = "bottomright"
+  )
+
+# Usage_MMBT
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(
+    color = ~colorNumeric("viridis", Usage_MMBT)(Usage_MMBT),
+    fillOpacity = 0.5,
+    popup = ~paste("Gas Consumption:", Usage_MMBT)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$Usage_MMBT), 
+    values = ~Usage_MMBT,
+    title = "Gas Consumption",
+    position = "bottomright"
+  )
+
+# Number_Accts
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(
+    color = ~colorNumeric("viridis", Number_Acc)(Number_Acc),
+    fillOpacity = 0.5,
+    popup = ~paste("Number of Accounts:", Number_Acc)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$Number_Acc), 
+    values = ~Number_Acc,
+    title = "Number of Accounts",
+    position = "bottomright"
+  )
+
+# Emissions_
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(
+    color = ~colorNumeric("viridis", Emissions_)(Emissions_),
+    fillOpacity = 0.5,
+    popup = ~paste("Emissions:", Emissions_)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$Emissions_), 
+    values = ~Emissions_,
+    title = "Emissions from Gas",
+    position = "bottomright"
+  )
+
+# USAGEPERCA
+leaflet(pse_data_clean) %>%
+  addTiles() %>%
+  addPolygons(
+    color = ~colorNumeric("viridis", USAGEPERCA)(USAGEPERCA),
+    fillOpacity = 0.5,
+    popup = ~paste("Gas Usage Per Capita:", USAGEPERCA)
+  ) %>%
+  addLegend(
+    pal = colorNumeric("viridis", pse_data_clean$USAGEPERCA), 
+    values = ~USAGEPERCA,
+    title = "Gas Usage Per Capita",
+    position = "bottomright"
+  )
+
+
+```
+
+
+The geographic plot, utilizing energy data prior to merging with the equity data, reveals an increased number of data points. We decided on the best path forward, is to divide the analysis into two distinct sections for GIS: one focusing on examining energy data through an equity lens, and the other concentrating on analyzing energy usage across the Seattle area. 
+The equity analysis will target key metrics such as Gas Usage Per Account to analyze patterns of energy efficiency or lack thereof within residential sectors, helping to identify which neighborhoods, potentially characterized by low-income and BIPOC communities, exhibit higher energy usage. This effort seeks to validate our theory that disadvantaged neighborhoods may exhibit lower energy efficiency.
+
+For the industrial sector, known for its significant variance, we will leverage spatial techniques alongside Principal Component Analysis (PCA) or Spatial Principal Component Analysis (SPCA). This approach will help us understand if outliers within the industrial data are meaningful, with the scores plot offering insights into potential outliers or natural sample groupings, thereby highlighting critical differences or similarities.
+
+The sector-specific analysis will also dissect energy usage across commercial and industrial realms, employing Gas Consumption as a principal metric to pinpoint high-energy consumption areas. Integrating an equity perspective with a sector specific analysis, will allow us to showcase a holistic energy consumption patterns across different sectors but also to bring to light any disparities in energy use efficiency that align with socioeconomic and demographic factors. 
+
+# Building Performance Exploratory Data Analysis
+For building performance data, a few graphs that show important metrics that we may want to analyze further
+
+```{r}
+#make distribution graphs for Total Gross Floor Area and median year built
+library(ggplot2)
+ggplot(combined_data, aes(x = Total_GFA)) +
+  geom_histogram(fill = "blue") +
+  labs(title = "Distribution of Total Gross Floor Area 2016-2022",
+       x = "Total Gross Floor Area",
+       y = "Frequency")
+
+ggplot(combined_data, aes(x = Median_Year_Built)) +
+  geom_histogram(fill = "blue") +
+  labs(title = "Distribution of Median Year Built 2016-2022",
+       x = "Median Year Built",
+       y = "Frequency")
+```
+
+Gross Floor Area: Total space inside a building measured in square feet, also measured across all floors of a building
+
+Distribution of Gross Floor Area: The x-axis is in tens of millions. The highest values in this graph are office buildings and mid rise multi-family buildings (apartments)
+
+Distribution of Median Year Built: Seattle is a relatively old city, the newest buildings are built in 2005. This means that most buildings would be built before energy consumption was a public concern
+
+```{r}
+print("Total Gross Floor Area")
+summary(combined_data$Total_GFA)
+gfa.p.val <- t.test(combined_data$Total_GFA)
+print(gfa.p.val)  
+  
+print("Median ES Score")
+summary(combined_data$Median_ES_Score)
+median_es.p.val <- t.test(combined_data$Median_ES_Score)
+print(median_es.p.val)  
+```
+
+Get the summary data and t-tests for gross floor area and median Energy star score
+Energy Star score is a comprehensive snapshot of the buildings energy performance,the score is 1-100 and assesses how your building is performing as a whole, taking into account its physical attributes, its operations, and how the people inside use it.
+
+The P-value rejects the null hypothesis and shows that the median ES score and the total GFA are not varying wildly.
+
+```{r}
+ggplot(combined_data, aes(x = Median_Year_Built, y = Total_GFA)) +
+  geom_point() +
+  labs(title = "Scatterplot between Median Year Built and Total Gross Floor Area",
+       x = "Median Year Built",
+       y = "Total_GFA")
+```
+
+Wanted to test the theory that buildings get bigger as time goes on. We can see a positive correlation especially for the biggest buildings for each time period/year. 
+
+```{r}
+#plot median year built vs median EUI
+ggplot(combined_data, aes(x = Median_Year_Built, y = Median_EUI)) +
+  geom_point() +
+  labs(title = "Median Energy Use Intensity and Median Year Built",
+       x = "Median Year Built",
+       y = "Median_EUI")
+```
+
+Energy Use Intensity (EUI): Measure of a buildings energy consumption per unit of floor area.
+
+We are wanting to see how efficiently buildings are using their energy by build year.
+
+
+```{r}
+#plot EUI over time
+ggplot(combined_data, aes(x = as.factor(Year), y = Median_EUI)) +
+  geom_line() +
+  labs(title = "Highest Median EUI per year",
+       x = "Year",
+       y = "Median EUI")
+```
+
+Looking to see highest EUI per year. Highest EUI's belong supermarkets and hospitals which would make sense that there is a dip at 2020 during the pandemic
+
+```{r}
+#plot the total gross floor area by building type
+ggplot(combined_data, aes(x = BuildingType, y = Total_GFA)) +
+  geom_boxplot() +
+  labs(title = "Total Gross Floor Area Across Building Types",
+       x = "Building Type",
+       y = "Total Gross Floor Area") +
+  theme(axis.text.x = element_text(angle = 90, size = 5)) 
+```
+
+With Y-axis is GFA in tens of millions, we are visually showing what total GFA looks like for each different type of building in our dataset and which types of buildings are typically bigger than others. 
+
+```{r}
+#correlation matrix 
+cor_data <- select(combined_data, -c(BuildingType))
+cor <- cor(cor_data)
+corrplot(cor, method = "number")
+```
+
+Quick correlation matrix to see which columns can be correlated. EUI scores are obviously highest while total GFA and number of buildings is also well correlated.
+
+
+# Building Energy Benchmarking Exploratory Data Analysis
+
+```{r}
+correlation_matrix <- cor(Bench_numerical)
+heatmap(correlation_matrix,
+        col = colorRampPalette(c("blue", "white", "red"))(100),
+        scale = "none",
+        symm = TRUE,
+        main = "Correlation Heatmap of Quantfiable Variables")
+```
+
+
+
+
+```{r}
+# Create boxplots to look for Outliers
+options(repr.plot.width=10, repr.plot.height=8)
+par(mfrow = c(2, 2))
+boxplot(Bench_cleaned$CouncilDistrictCode, col = "aquamarine", main = "Council District Code")
+boxplot(Bench_cleaned$YearBuilt, col = "aquamarine", main = "Year Built")
+boxplot(Bench_cleaned$NumberofBuildings, col = "aquamarine", main = "Number of Buildings")
+boxplot(Bench_cleaned$NumberofFloors, col = "aquamarine", main = "Number of Floors")
+boxplot(Bench_cleaned$PropertyGFATotal, col = "aquamarine", main = "Property Gross Floor Area")
+boxplot(Bench_cleaned$PropertyGFAParking, col = "aquamarine", main = "Property GF Area for Parking")
+boxplot(Bench_cleaned$PropertyGFABuilding.s., col = "aquamarine", main = "Property GFA Building")
+boxplot(Bench_cleaned$SiteEUI.kBtu.sf., col = "aquamarine", main = "Site Energy Use Intensity")
+boxplot(Bench_cleaned$SiteEUIWN.kBtu.sf., col = "aquamarine", main = "Site Energy Use Intensity (WN)")
+boxplot(Bench_cleaned$SourceEUI.kBtu.sf., col = "aquamarine", main = "Source Energy Use Intensity")
+boxplot(Bench_cleaned$SourceEUIWN.kBtu.sf., col = "aquamarine", main = "Source Energy Use Intensity (WN)")
+boxplot(Bench_cleaned$SiteEnergyUse.kBtu., col = "aquamarine", main = "Site Energy Use")
+boxplot(Bench_cleaned$SiteEnergyUseWN.kBtu., col = "aquamarine", main = "Site Energy Use (WN)")
+boxplot(Bench_cleaned$Electricity.kWh., col = "aquamarine", main = "Electricity Use (kWh)")
+boxplot(Bench_cleaned$Electricity.kBtu., col = "aquamarine", main = "Electricity Use (kBtu)")
+boxplot(Bench_cleaned$TotalGHGEmissions, col = "aquamarine", main = "Total GHG Emissions")
+boxplot(Bench_cleaned$GHGEmissionsIntensity, col = "aquamarine", main = "GHG Emissions Intensity")
+par(mfrow = c(1, 1))
+```
+
+Visual map of outliers, but chose not to remove outliers because they represent individual buildings and the variation is to be expected between different types of buildings in different locations.
+
+
+```{r}
+#Creating Histograms to Visualize Distribution
+options(repr.plot.width=10, repr.plot.height=8)
+par(mfrow = c(2, 2))
+hist(Bench_cleaned$CouncilDistrictCode, main = "Council District Code", xlab = "District Code", col = "aquamarine")
+hist(Bench_cleaned$YearBuilt, main = "Year Built", xlab = "Year", col = "aquamarine")
+hist(Bench_cleaned$NumberofBuildings, main = "Number of Buildings", xlab = "Number of Buildings", col = "aquamarine")
+hist(Bench_cleaned$NumberofFloors, main = "Number of Floors", xlab = "Number of Floors", col = "aquamarine")
+hist(Bench_cleaned$PropertyGFATotal, main = "Property Gross Floor Area", xlab = "Area", col = "aquamarine")
+hist(Bench_cleaned$PropertyGFAParking, main = "Property GF Area for Parking", xlab = "Area", col = "aquamarine")
+hist(Bench_cleaned$PropertyGFABuilding.s., main = "Property GFA Building", xlab = "Area", col = "aquamarine")
+hist(Bench_cleaned$SiteEUI.kBtu.sf., main = "Site Energy Use Intensity", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SiteEUIWN.kBtu.sf., main = "Site Energy Use Intensity (WN)", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SourceEUI.kBtu.sf., main = "Source Energy Use Intensity", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SourceEUIWN.kBtu.sf., main = "Source Energy Use Intensity (WN)", xlab = "Intensity (kBtu/sf)", col = "aquamarine")
+hist(Bench_cleaned$SiteEnergyUse.kBtu., main = "Site Energy Use", xlab = "Energy Use (kBtu)", col = "aquamarine")
+hist(Bench_cleaned$SiteEnergyUseWN.kBtu., main = "Site Energy Use (WN)", xlab = "Energy Use (kBtu)", col = "aquamarine")
+hist(Bench_cleaned$Electricity.kWh., main = "Electricity Use (kWh)", xlab = "Electricity Use (kWh)", col = "aquamarine")
+hist(Bench_cleaned$Electricity.kBtu., main = "Electricity Use (kBtu)", xlab = "Electricity Use (kBtu)", col = "aquamarine")
+hist(Bench_cleaned$TotalGHGEmissions, main = "Total GHG Emissions", xlab = "GHG Emissions", col = "aquamarine")
+hist(Bench_cleaned$GHGEmissionsIntensity, main = "GHG Emissions Intensity", xlab = "Intensity", col = "aquamarine")
+par(mfrow = c(1, 1))
+```
+
+
+Histograms also show distribution of data and that there exists outliers.
+
+# Conclusion
+
+Using PSE usage as well as Racial and Social equity data, some things we hope to accomplish are determining correlation between high energy usage areas and low income communities. From there we may determine causation and possible solutions. 
+
+Using Building performance and energy benchmarking data, from here we hope to measure how successful the City of Seattle has been in achieving it's energy and pollution reduction goals. This includes the end goal of the City of Seattle being carbon neutral by 2050.
+
+# Graphs for presentation
+
+```{r Outline seattle create base map}
+
+# 2020 Census Blocks - Seattle
+seattle_base <- st_read("../Data/2020_Census_Blocks_-_Seattle.shp")
+
+```
+
+
+```{r GIS 2023 Gas Emissions}
+
+# Plot the basemap
+ggplot(data = seattle_base) +
+  geom_sf() +  # This will plot the census block polygons
+  theme_minimal() +
+  labs(title = "Seattle Census Blocks Basemap") +
+  coord_sf(datum = NA)
+
+pse_data_clean$Emissions_ <- as.numeric(pse_data_clean$Emissions_)
+
+# Create a color palette function using viridis
+emissions_palette <- colorNumeric(palette = "viridis", domain = pse_data_clean$Emissions_)
+
+# Create the static plot
+ggplot(data = pse_data_clean) +
+  geom_sf(aes(fill = Emissions_), color = "white", size = 0.2) + 
+  scale_fill_viridis_c() +
+  labs(
+    title = "Emissions from Gas",
+    fill = "Emissions"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+# Plot the basemap and overlay the emissions data
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) + # The basemap
+  geom_sf(data = pse_data_clean, aes(fill = Emissions_), size = 0.1, alpha = 0.5) + # Overlay emissions
+  scale_fill_viridis_c() + # Color scale for emissions
+  labs(title = "Seattle Census Blocks with Gas Emissions Overlay") +
+  theme_minimal() +
+  coord_sf(datum = NA)
+
+# Filter the emissions data for the year 2023
+pse_data_2023 <- pse_data_clean %>% 
+  filter(CAL_YEAR == 2023)
+
+quantiles <- quantile(pse_data_2023$Emissions_, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+
+# Cut the Emissions_ data into bins based on these percentiles
+pse_data_2023$Emissions_Percentile <- cut(pse_data_2023$Emissions_, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
+# Plot the map with emissions categorized by percentiles
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
+  geom_sf(data = pse_data_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = c("0-20%" = "yellow", "20-40%" = "green", "40-60%" = "blue", "60-80%" = "purple", "80-100%" = "red"),
+    name = "Gas Emissions\n(Percentiles)"
+  ) +
+  labs(title = "Seattle Gas Emissions for 2023") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+
+```
+
+
+Quantile calculations are performed on the Emissions_ column to identify the natural breaks in the data at the 20th, 40th, 60th, and 80th percentiles These quantiles serve as breakpoints to categorize emissions into five percentile ranges. The 2023  emissions data is segmented into these percentile bins, transforming a continuous variable into a categorical one for more straightforward visual interpretation. A custom manual color scale enhances the distinction between different emission levels.
+
+
+
+```{r equity graph}
+
+# Ensure COMPOSIT_1 is a factor with the levels in the desired order
+equity_data$COMPOSIT_1 <- factor(equity_data$COMPOSIT_1, 
+                                 levels = c("Lowest", "Second Lowest", "Middle", "Second Highest", "Highest Equity Priority"))
+
+# Define discrete colors corresponding to the levels in COMPOSIT_1
+colors <- c("Lowest" = "blue",
+            "Second Lowest" = "lightblue",
+            "Middle" = "green",
+            "Second Highest" = "orange",
+            "Highest Equity Priority" = "red")
+
+# Create the map
+ggplot() +
+  geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) + 
+  geom_sf(data = equity_data, aes(fill = COMPOSIT_1), size = 0.1, alpha = 0.5) +
+  scale_fill_manual(
+    values = colors,
+    name = "Quintile",
+    labels = c("Lowest", "Second Lowest", "Middle", "Second Highest", "Highest Equity Priority")
+  ) +
+  labs(title = "Seattle Racial and Social Equity Index") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  coord_sf(datum = NA)
+```
+
+
+
+
+
+
+```{r Morgan test - PSE}
+
+# Get unique values from the 'RSE_Quinti' column
+colname_test <- unique(GIS_EE_encoded$Sector)
+
+# Output the unique values
+print(colname_test)
+
+# Sector, Usage_MMBTU, Number_Accts, Emissions_MTCO2E, USAGEPERCAPITA_MMBTU, EMISSIONSPERCAPITA_MTCO2E, COMPOSITE_QUINTILE
+
+```
+
+
+
+
+
+
+
+```{r Morgan test - PSE}
+
+# Create neighbors and weights
+neighbors <- poly2nb(pse_data_clean)
+weights <- nb2listw(neighbors, style="W", zero.policy=TRUE)
+
+# Moran's I test for Emissions_
+moran_Emissions <- moran.test(pse_data_clean$Emissions_, weights)
+
+# Moran's I test for Usage_MMBT
+moran_Usage_MMBT <- moran.test(pse_data_clean$Usage_MMBT, weights)
+
+# Moran's I test for Number_Acc
+moran_Number_Acc <- moran.test(pse_data_clean$Number_Acc, weights)
+
+# Moran's I test for USAGEPERCA
+moran_USAGEPERCA <- moran.test(pse_data_clean$USAGEPERCA, weights)
+
+# Moran's I test for EMISSIONSP
+moran_EMISSIONSP <- moran.test(pse_data_clean$EMISSIONSP, weights)
+
+# For RSE_Quintile, ensure it's a numeric variable since Moran's I requires numeric inputs
+pse_data_clean$RSE_Quintile_numeric <- as.numeric(factor(pse_data_clean$RSE_Quinti, levels = c("Lowest", "Second lowest", "Middle", "Second highest", "Highest priority/Most disadvantaged")))
+moran_RSE_Quintile <- moran.test(pse_data_clean$RSE_Quintile_numeric, weights)
+
+# Encode the 'Sector' variable into an ordered numeric factor if there is a logical order
+pse_data_clean$Sector_numeric <- as.numeric(factor(pse_data_clean$Sector, 
+                                                   levels = c("Commercial", "Industrial", "Residential")))
+
+# Perform Moran's I test for the numerically encoded 'Sector'
+moran_Sector <- moran.test(pse_data_clean$Sector_numeric, weights)
+
+# Print the results
+print(moran_USAGEPERCA)
+print(moran_EMISSIONSP)
+print(moran_RSE_Quintile)
+print(moran_Number_Acc)
+print(moran_Emissions)
+print(moran_Usage_MMBT)
+print(moran_RSE_Quintile)
+print(moran_Sector)
+
+```
+
+High Moran's I statistics across various variables, indicating strong positive spatial autocorrelation.
+Particularly high values for "USAGEPERCA" and "EMISSIONSP," suggesting these aspects of energy data are highly clustered spatially.
+
+
+
+```{r Morgan test - RSE}
+
+# Define the order of the equity levels from lowest to highest equity priority
+levels_order <- c("Lowest", "Second Lowest", "Middle", "Second Highest", "Highest Equity Priority")
+
+# Convert 'COMPOSIT_1' to a factor with levels in the order specified above
+equity_data$COMPOSIT_1 <- factor(equity_data$COMPOSIT_1, levels = levels_order)
+
+# Convert the factor to numeric
+equity_data$COMPOSIT_1_numeric <- as.numeric(equity_data$COMPOSIT_1)
+
+# Prepare the neighbors and weights
+neighbors_equity <- poly2nb(equity_data)
+weights_equity <- nb2listw(neighbors_equity, style="W", zero.policy=TRUE)
+
+# Perform Moran's I test for the numerically encoded 'COMPOSIT_1'
+moran_COMPOSIT_1 <- moran.test(equity_data$COMPOSIT_1_numeric, weights_equity)
+
+# Print the results
+print(moran_COMPOSIT_1)
+
+
+
+```
+
+The Moran's I statistic for "COMPOSIT_1_numeric" also indicates strong positive spatial autocorrelation, though the value is lower compared to some of the energy variables.
+
+
+```{r Morgan test - merged data}
+
+# Convert 'Sector' to a numeric factor
+if(!is.numeric(GIS_EE_encoded$Sector)) {
+  GIS_EE_encoded$Sector_numeric <- as.numeric(factor(GIS_EE_encoded$Sector, 
+                                                     levels = c("Commercial", "Industrial", "Residential")))
+} else {
+  GIS_EE_encoded$Sector_numeric <- GIS_EE_encoded$Sector
+}
+
+# Prepare the neighbors and weights
+neighbors_merged <- poly2nb(GIS_EE_encoded)
+weights_merged <- nb2listw(neighbors_merged, style="W", zero.policy=TRUE)
+
+# Perform Moran's I test for each column
+moran_results <- list()
+
+# Perform Moran's I test for the 'Sector_numeric'
+moran_results$Sector <- moran.test(GIS_EE_encoded$Sector_numeric, weights_merged)
+
+# Perform Moran's I test for 'Usage_MMBTU'
+moran_results$Usage_MMBTU <- moran.test(GIS_EE_encoded$Usage_MMBTU, weights_merged)
+
+# Perform Moran's I test for 'Number_Accts'
+moran_results$Number_Accts <- moran.test(GIS_EE_encoded$Number_Accts, weights_merged)
+
+# Perform Moran's I test for 'Emissions_MTCO2E'
+moran_results$Emissions_MTCO2E <- moran.test(GIS_EE_encoded$Emissions_MTCO2E, weights_merged)
+
+# Perform Moran's I test for 'USAGEPERCAPITA_MMBTU'
+moran_results$USAGEPERCAPITA_MMBTU <- moran.test(GIS_EE_encoded$USAGEPERCAPITA_MMBTU, weights_merged)
+
+# Perform Moran's I test for 'EMISSIONSPERCAPITA_MTCO2E'
+moran_results$EMISSIONSPERCAPITA_MTCO2E <- moran.test(GIS_EE_encoded$EMISSIONSPERCAPITA_MTCO2E, weights_merged)
+
+# Perform Moran's I test for 'COMPOSITE_QUINTILE'
+moran_results$COMPOSITE_QUINTILE <- moran.test(GIS_EE_encoded$COMPOSITE_QUINTILE, weights_merged)
+
+# Print the results
+print(moran_results)
+
+
+```
+
+
+Moran's I statistics in the merged dataset for variables like "Sector_numeric" and "COMPOSITE_QUINTILE" remain high, suggesting continued strong positive spatial autocorrelation. However, the Moran's I statistics for "Usage_MMBTU" and "Emissions_MTCO2E" are notably lower than their counterparts in the energy data, indicating less spatial clustering in the merged data.
+
+
+
+```{r Building Performance Analysis - regroup building types}
+
+# Display unique building types
+unique_building_types <- unique(combined_data$BuildingType)
+print(unique_building_types)
+
+# Define a new column for the grouped building types
+combined_data$GroupedBuildingType <- combined_data$BuildingType
+
+# Replace similar building types with a standardized name
+combined_data$GroupedBuildingType <- gsub("High-Rise Multifamily|High-rise Multifamily", "High-rise Multifamily", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Mid-Rise Multifamily|Mid-rise Multifamily", "Mid-rise Multifamily", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Low-Rise Multifamily|Low-rise Multifamily", "Low-rise Multifamily", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Small- and Mid-Sized Office|Small/Mid-size Office", "Small and Mid-size Office", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Supermarket / Grocery Store|Supermarket/Grocery Store", "Supermarket/Grocery Store", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Hospital \\(General Medical & Surgical\\)|Hospital", "Hospital", combined_data$GroupedBuildingType)
+combined_data$GroupedBuildingType <- gsub("Residence Hall/Dormitory|Residence Hall", "Residence Hall/Dormitory", combined_data$GroupedBuildingType)
+
+# Check the new unique grouped building types
+unique_grouped_building_types <- unique(combined_data$GroupedBuildingType)
+print(unique_grouped_building_types)
+
+
+
+```
+
+
+```{r quick EDA}
+
+# Assuming cor_matrix is already computed
+cor_matrix <- cor(combined_data[, 2:9])
+
+# Find correlations greater than 0.6, excluding the diagonal
+high_cor_matrix <- cor_matrix > 0.6
+diag(high_cor_matrix) <- FALSE
+
+# Initialize an empty data frame to store results
+significant_correlations <- data.frame(
+  Var1 = character(),
+  Var2 = character(),
+  Correlation = numeric(),
+  P_Value = numeric()
+)
+
+# Loop through the high_cor_matrix to calculate and check significance
+for (i in seq_len(nrow(high_cor_matrix))) {
+  for (j in seq_len(ncol(high_cor_matrix))) {
+    if (high_cor_matrix[i, j]) {
+      test_result <- cor.test(combined_data[, i + 1], combined_data[, j + 1])
+      if (test_result$p.value < 0.05) {
+        # Add to results if significant
+        significant_correlations <- rbind(significant_correlations, data.frame(
+          Var1 = colnames(combined_data)[i + 1],
+          Var2 = colnames(combined_data)[j + 1],
+          Correlation = cor_matrix[i, j],
+          P_Value = test_result$p.value
+        ))
+      }
+    }
+  }
+}
+
+# Print significant correlations with their p-values
+if (nrow(significant_correlations) > 0) {
+  print("Significant correlations (p < 0.05):")
+  print(significant_correlations)
+} else {
+  print("No significant correlations above 0.6 were found.")
+}
+
+
+```
+
+
+
+
+
+
+
+
+```{r High-Impact Building Types}
+
+# Calculate summary statistics for each grouped building type
+library(dplyr)
+
+eui_summary_grouped <- combined_data %>%
+  group_by(GroupedBuildingType) %>%
+  summarise(
+    Count = n(),
+    Mean_EUI = mean(Median_EUI, na.rm = TRUE),
+    SD_EUI = sd(Median_EUI, na.rm = TRUE),
+    Median_EUI = median(Median_EUI, na.rm = TRUE),
+    Percentile_75th_EUI = quantile(Median_EUI, 0.75, na.rm = TRUE),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(Median_EUI))
+
+# Filter for high-impact buildings based on the top quartile of Median EUI
+top_quartile_threshold_grouped <- quantile(eui_summary_grouped$Median_EUI, 0.75)
+high_impact_buildings_grouped <- eui_summary_grouped %>%
+  filter(Median_EUI >= top_quartile_threshold_grouped)
+
+# View the high-impact grouped building types
+print(high_impact_buildings_grouped)
+
+# Enhanced bar chart of the Median EUI for high-impact building types
+ggplot(high_impact_buildings_grouped, aes(x = reorder(GroupedBuildingType, -Median_EUI), y = Median_EUI)) +
+  geom_bar(stat = "identity", fill = "dodgerblue3") +
+  labs(
+    x = NULL,
+    y = "Median EUI",
+    title = "High-Impact Building Types Based on Median EUI",
+    subtitle = "EUI: Energy use intensity measured per unit of floor area",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    plot.caption = element_text(hjust = 0.5, size = 8)
+  ) +
+  scale_y_continuous(labels = scales::comma) # This will add commas to y-axis labels for readability
+
+
+
+```
+
+
+
+
+```{r Building Energy Benchmarking}
+
+
+# Display unique building and property types
+unique_building_types <- unique(Bench_cleaned$BuildingType)
+unique_property_types <- unique(Bench_cleaned$PrimaryPropertyType)
+
+# Create a new column for the grouped building types
+Bench_cleaned$GroupedBuildingType <- Bench_cleaned$BuildingType
+
+# Apply grouping rules for BuildingType
+Bench_cleaned$GroupedBuildingType <- ifelse(grepl("Nonresidential", Bench_cleaned$BuildingType, ignore.case = TRUE), 
+                                            "Nonresidential", 
+                                            Bench_cleaned$GroupedBuildingType)
+
+Bench_cleaned$GroupedBuildingType <- ifelse(grepl("Multifamily", Bench_cleaned$BuildingType), 
+                                            "Multifamily", 
+                                            Bench_cleaned$GroupedBuildingType)
+
+# Assuming "Campus" includes various educational facilities and "SPS-District K-12" is for K-12 schools
+Bench_cleaned$GroupedBuildingType <- ifelse(grepl("SPS-District K-12", Bench_cleaned$BuildingType) | 
+                                            grepl("Campus", Bench_cleaned$BuildingType), 
+                                            "Educational", 
+                                            Bench_cleaned$GroupedBuildingType)
+
+# Check the new unique grouped building types
+unique_grouped_building_types <- unique(Bench_cleaned$GroupedBuildingType)
+print(unique_grouped_building_types)
+
+
+# Assuming Bench_cleaned is your dataset
+
+# Create a new column for the grouped property types
+Bench_cleaned$GroupedPrimaryPropertyType <- Bench_cleaned$PrimaryPropertyType
+
+# Apply grouping rules for PrimaryPropertyType
+multifamily_types <- c("Mid-Rise Multifamily", "Low-Rise Multifamily", "High-Rise Multifamily",
+                       "Multifamily MR (5-9)", "Multifamily LR (1-4)", "Multifamily HR (10+)")
+office_types <- c("Small- and Mid-Sized Office", "Large Office", "Office")
+hospital_types <- c("Hospital", "Hospital (General Medical & Surgical)", "Other/Specialty Hospital")
+residence_types <- c("Residence Hall", "Residence Hall/Dormitory", "Other - Lodging/Residential")
+warehouse_types <- c("Warehouse", "Non-Refrigerated Warehouse", "Refrigerated Warehouse")
+retail_types <- c("Retail Store", "Other - Mall", "Enclosed Mall", "Strip Mall", "Wholesale Club/Supercenter")
+education_types <- c("University", "College/University", "K-12 School", "Other - Education", "Adult Education")
+food_service_types <- c("Restaurant", "Food Service", "Other - Restaurant/Bar")
+
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% multifamily_types, 
+                                                    "Multifamily Housing", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% office_types, 
+                                                    "Office Buildings", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% hospital_types, 
+                                                    "Hospitals", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% residence_types, 
+                                                    "Residential Facilities", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% warehouse_types, 
+                                                    "Warehouses", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% retail_types, 
+                                                    "Retail Spaces", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% education_types, 
+                                                    "Educational Institutions", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(Bench_cleaned$PrimaryPropertyType %in% food_service_types, 
+                                                    "Food Services", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+# Combine "Supermarket / Grocery Store" and "Supermarket/Grocery Store"
+Bench_cleaned$GroupedPrimaryPropertyType <- ifelse(grepl("Supermarket", Bench_cleaned$PrimaryPropertyType), 
+                                                    "Supermarkets/Grocery Stores", 
+                                                    Bench_cleaned$GroupedPrimaryPropertyType)
+
+# Check the new unique grouped primary property types
+unique_grouped_primary_property_types <- unique(Bench_cleaned$GroupedPrimaryPropertyType)
+print(unique_grouped_primary_property_types)
+
+# Extract and print unique column names
+unique_column_names <- names(Bench_cleaned)
+print(unique_column_names)
+
+```
+
+
+Group "NonResidential", "Nonresidential COS", and "Nonresidential WA" under "Nonresidential".
+Group all multifamily types like "Multifamily MR (5-9)", "Multifamily LR (1-4)", and "Multifamily HR (10+)" under "Multifamily".
+"SPS-District K-12" appears to be a specific type for schools, and "Campus" could potentially include various educational facilities. Depending on the context, these could be grouped under "Educational"
+
+Group all multifamily types like "Mid-Rise Multifamily", "Low-Rise Multifamily", "High-Rise Multifamily", "Multifamily MR (5-9)", "Multifamily LR (1-4)", and "Multifamily HR (10+)" under "Multifamily Housing".
+Combine "Small- and Mid-Sized Office", "Large Office", and "Office" into "Office Buildings".
+Group "Supermarket / Grocery Store" and "Supermarket/Grocery Store" into "Supermarkets/Grocery Stores".
+Consolidate "Hospital", "Hospital (General Medical & Surgical)", and "Other/Specialty Hospital" into "Hospitals".
+Group "Residence Hall", "Residence Hall/Dormitory", and "Other - Lodging/Residential" into "Residential Facilities".
+Combine "Warehouse", "Non-Refrigerated Warehouse", and "Refrigerated Warehouse" into "Warehouses".
+Group all retail-related types like "Retail Store", "Other - Mall", "Enclosed Mall", "Strip Mall", and "Wholesale Club/Supercenter" under "Retail Spaces".
+Combine "University", "College/University", "K-12 School", "Other - Education", "Adult Education" into "Educational Institutions".
+Group "Restaurant", "Food Service", and "Other - Restaurant/Bar" into "Food Services".
+
+
+
+```{r basic EDA}
+
+# Select only the numerical columns for correlation analysis
+numerical_data <- Bench_cleaned %>% select_if(is.numeric)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(numerical_data, use = "pairwise.complete.obs")
+
+# Find pairs with high correlation
+high_cor_matrix <- cor_matrix > 0.6
+diag(high_cor_matrix) <- FALSE  
+
+# Initialize a matrix to store the p-values
+p_values_matrix <- matrix(nrow = ncol(numerical_data), ncol = ncol(numerical_data))
+rownames(p_values_matrix) <- colnames(numerical_data)
+colnames(p_values_matrix) <- colnames(numerical_data)
+
+# Loop over the high_cor_matrix to calculate p-values
+for(i in 1:nrow(high_cor_matrix)) {
+  for(j in 1:ncol(high_cor_matrix)) {
+    if(high_cor_matrix[i, j]) {
+      test_result <- cor.test(numerical_data[[i]], numerical_data[[j]], method = "pearson")
+      p_values_matrix[i, j] <- test_result$p.value
+    }
+  }
+}
+
+# Find significant correlations with p-value < 0.05
+significant_correlations <- high_cor_matrix & p_values_matrix < 0.05
+
+# Convert the significant correlations matrix to a data frame
+significant_pairs <- which(significant_correlations, arr.ind = TRUE)
+significant_results <- data.frame(
+  Var1 = rownames(cor_matrix)[significant_pairs[, "row"]],
+  Var2 = colnames(cor_matrix)[significant_pairs[, "col"]],
+  Correlation = cor_matrix[significant_correlations],
+  P_Value = p_values_matrix[significant_correlations]
+)
+
+significant_results <- significant_results[order(-significant_results$Correlation), ]
+
+
+# Print the significant correlations with their p-values
+print(significant_results)
+
+
+```
+
+
+
+
+```{r gas vs electric}
+
+# Load the necessary library
+library(stats)
+
+# Conduct a correlation analysis between SiteEnergyUse.kBtu. and Electricity.kBtu.
+correlation_site_energy_electricity <- cor.test(Bench_cleaned$SiteEnergyUse.kBtu., 
+                                                Bench_cleaned$Electricity.kBtu., 
+                                                method = "pearson")
+
+# Print the correlation coefficient and p-value
+cat("Correlation between SiteEnergyUse.kBtu. and Electricity.kBtu.:\n")
+cat("r =", correlation_site_energy_electricity$estimate, "\n")
+cat("p-value =", correlation_site_energy_electricity$p.value, "\n\n")
+
+# Assess the correlation between TotalGHGEmissions and SiteEUI.kBtu.sf.
+correlation_ghg_siteeui <- cor.test(Bench_cleaned$TotalGHGEmissions, 
+                                    Bench_cleaned$SiteEUI.kBtu.sf., 
+                                    method = "pearson")
+
+# Print the correlation coefficient and p-value
+cat("Correlation between TotalGHGEmissions and SiteEUI.kBtu.sf.:\n")
+cat("r =", correlation_ghg_siteeui$estimate, "\n")
+cat("p-value =", correlation_ghg_siteeui$p.value, "\n\n")
+
+# Assess the correlation between TotalGHGEmissions and Electricity.kBtu.
+correlation_ghg_electricity <- cor.test(Bench_cleaned$TotalGHGEmissions, 
+                                        Bench_cleaned$Electricity.kBtu., 
+                                        method = "pearson")
+
+# Print the correlation coefficient and p-value
+cat("Correlation between TotalGHGEmissions and Electricity.kBtu.:\n")
+cat("r =", correlation_ghg_electricity$estimate, "\n")
+cat("p-value =", correlation_ghg_electricity$p.value, "\n")
+
+
+
+```
+
+
+```{r test bins for building size}
+# Calculate the quantiles for PropertyGFATotal
+quantiles <- quantile(Bench_cleaned$PropertyGFATotal, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
+
+# Round the quantiles to the nearest whole number
+quantiles <- round(quantiles)
+
+# Create more descriptive labels using the rounded quantiles
+Bench_cleaned <- Bench_cleaned %>%
+  mutate(
+    SizeBin = cut(PropertyGFATotal,
+                  breaks = quantiles,
+                  include.lowest = TRUE,
+                  labels = c(
+                    paste("Small (<= ", quantiles[2], " sqft)"),
+                    paste("Medium (", quantiles[2]+1, "-", quantiles[3], " sqft)"),
+                    paste("Large (", quantiles[3]+1, "-", quantiles[4], " sqft)"),
+                    paste("Very Large (> ", quantiles[4], " sqft)")
+                  ))
+  )
+
+# Check the new SizeBin labels
+table(Bench_cleaned$SizeBin)
+
+
+
+```
+
+
+Segmented buildings by total gross floor area to understand size impact.
+
+Size categories are as follows:
+Small: Up to 29,084 sqft - reflect individual or small business properties.
+Medium: 29,085 - 45,878 sqft - typical of mid-sized commercial buildings.
+Large: 45,879 - 96,357 sqft - larger commercial spaces and complexes.
+Very Large: Over 96,357 sqft - major commercial and industrial facilities.
+Explored how building size correlates with Site EUI and GHG emissions.
+
+Analytical Description for Building Size Graph:
+"In this graph, each point clusters by size category, offering insight into the scale of GHG emissions relative to building size. Smaller buildings tend to have a more compact cluster, suggesting uniformity in their energy use intensity. However, very large buildings display a wide variation in emissions, indicating a diverse range of energy practices and efficiency levels. This diversity highlights the importance of customizing energy-saving solutions to the size and use of the building."
+
+Presenter's Note:
+"For each slide, consider the historical context when explaining the bins for the years. Highlight how advances in building technology and shifts in energy standards have influenced the energy efficiency of buildings. For the building size slide, emphasize the importance of tailored energy efficiency strategies that take into account the unique energy profiles of buildings of different sizes."
+
+
+
+
+```{r graph age vs size}
+Bench_cleaned <- Bench_cleaned %>%
+  mutate(
+    BuildingEra = cut(YearBuilt,
+                      breaks = c(-Inf, 1940, 1980, 2000, Inf),
+                      labels = c("Pre-1940", "1940-1979", "1980-1999", "2000-present"),
+                      right = FALSE), # Ensures that the interval is left-closed
+    SizeBin = cut(PropertyGFATotal, 
+                  breaks = quantile(PropertyGFATotal, probs = seq(0, 1, by = 0.25), na.rm = TRUE), 
+                  include.lowest = TRUE, 
+                  labels = c("Small ( <= 29084  sqft)", "Medium (29085 - 45878  sqft)", "Large (45879 - 96357  sqft)", "Very Large ( > 96357  sqft)")))
+
+
+# Now you can plot the energy use and emissions for each segment
+
+# Scatter Plot of GHG Emissions vs. Site EUI for different age bins
+# ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = BuildingEra)) +
+#   geom_point(alpha = 0.5) +
+#   geom_smooth(method = "lm", se = FALSE) +
+#   facet_wrap(~BuildingEra) +
+#   labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Age", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
+#   theme_minimal() +
+#   scale_color_brewer(palette = "Set1") + 
+#   coord_cartesian(xlim = c(0,750), ylim = c(0,5000))
+# 
+# # Scatter Plot of GHG Emissions vs. Site EUI for different size bins
+# ggplot(Bench_cleaned, aes(x = SiteEUI.kBtu.sf., y = TotalGHGEmissions, color = SizeBin)) +
+#   geom_point(alpha = 0.5) +
+#   geom_smooth(method = "lm", se = FALSE) +
+#   facet_wrap(~SizeBin) +
+#   labs(x = "Site EUI", y = "Total GHG Emissions", title = "GHG Emissions by Site EUI and Building Size", subtitle = "EUI: Energy use intensity measured per unit of floor area",) +
+#   theme_minimal() +
+#   scale_color_brewer(palette = "Set1") + 
+#   coord_cartesian(xlim = c(0,750), ylim = c(0,2500))
+# 
+
+model_age <- lm(TotalGHGEmissions ~ BuildingEra, data = Bench_cleaned)
+model_size <- lm(TotalGHGEmissions ~ SizeBin, data = Bench_cleaned)
+
+
+summary(model_age)
+summary(model_size)
+```
+
+
+
+Analyzed energy data by building era, based on construction year.
+
+Bins reflect significant periods in construction practices:
+Pre-1940: Before modern construction materials.
+1940-1979: Post-war to pre-energy crisis, varying insulation
+
+Bullet Points for Building Age:
+
+Analyzed energy data by building era, based on construction year.
+Bins reflect significant periods in construction practices:
+Pre-1940: Before modern construction materials.
+1940-1979: Post-war to pre-energy crisis, varying insulation.
+1980-1999: Introduction of energy efficiency measures.
+Post-2000: Buildings with modern energy standards.
+Observed trends between building age, Site EUI, and GHG emissions.
+
+Analytical Description for Building Age Graph:
+"The graph depicts a clear evolution in building energy performance over time. Older buildings, particularly those constructed pre-1940, show a varied relationship between Site EUI and GHG emissions. This points towards potential opportunities for retrofitting. As we move towards more recent times, the post-2000 buildings tend to have a more consistent and favorable energy profile, reflecting modern construction standards' impact on energy efficiency."
+
+
+
+```{r SiteEnergyUse.kBtu. and Electricity.kBtu.}
+
+plot(Bench_cleaned$SiteEnergyUse.kBtu., Bench_cleaned$Electricity.kBtu.)
+
+```
+
+
+
+
+
