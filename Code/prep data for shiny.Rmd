@@ -1,0 +1,271 @@
+---
+title: "Interactive Map with Emissions Data"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(shiny)
+library(leaflet)
+library(dplyr)
+library(sf)
+library(scales) # For colorQuantile
+```
+
+
+
+```{r data}
+PSE <- st_read("../Data/PSE_Gas_Tracts_2.shp")
+PSE <- subset(PSE, Grouped_Fl=='TRUE')
+PSE$Census_Tra <- as.character(PSE$Census_Tra)
+# Renaming Columns for Clarity
+PSE <- PSE %>% 
+  rename(
+    Grouped_Flag = Grouped_Fl, 
+    `Gas Consumption` = Usage_MMBT, 
+    `User Accounts` = Number_Acc, 
+    `Gas Emissions` = Emissions_, 
+    `Gas Usage Per Account` = USAGEPERCA, 
+    `Emissions Per Account` = EMISSIONSP, 
+    RSE_Quintile = RSE_Quinti, 
+    SHAPE_Length = SHAPE_Leng
+  )
+
+
+PSE <- PSE %>%
+  mutate(`Gas Consumption Percentile` = ntile(`Gas Consumption`, 100),
+         `User Accounts Percentile` = ntile(`User Accounts`, 100),
+         `Gas Emissions Percentile` = ntile(`Gas Emissions`, 100),
+         `Gas Usage Per Account Percentile` = ntile(`Gas Usage Per Account`, 100),
+         `Emissions Per Account Percentile` = ntile(`Emissions Per Account`, 100))
+
+
+# Write a clean shp file to be used directly in Shiny
+#st_write(PSE, '../Data/PSE.shp', delete_layer = TRUE)
+
+head(PSE)
+```
+
+```{r}
+
+library(sf)
+library(dplyr)
+
+# Reading the shapefile
+Equity_RSE <- st_read("../Data/Race_and_Social_Equity_Composite_Index_for_2020_Census_Tract_Geographies.shp")
+
+# Check for unique values before transformation
+unique_compquin_values <- unique(Equity_RSE$COMPOSIT_1)
+unique_healthquin_values <- unique(Equity_RSE$HEALTH_D_1)
+unique_socioquin_values <- unique(Equity_RSE$SOCIOECO_2)
+unique_racequin_values <- unique(Equity_RSE$RACE_ELL_1)
+
+
+# Step 1: Creating a Subset of Relevant Columns and Renaming for Clarity
+Equity_RSE <- Equity_RSE %>%
+  select(
+    ObjID = OBJECTID,
+    GeoID = GEOID,
+    ShpLen = SHAPE_Leng,
+    ShpArea = SHAPE_Area,
+    RaceQuin = RACE_ELL_1,
+    SocioQuin = SOCIOECO_2,
+    HealthQuin = HEALTH_D_1,
+    CompQuin = COMPOSIT_1,
+    geometry
+  )
+
+# Step 2: Checking for Null Values
+null_values <- sapply(Equity_RSE, function(x) sum(is.na(x)))
+
+# Step 3: Standardizing Quintile Labels
+# Map the original text values to a numeric scale
+quin_map <- setNames(1:5, unique_compquin_values[!is.na(unique_compquin_values)])
+Equity_RSE$CompQuinNum <- unname(quin_map[Equity_RSE$CompQuin])
+
+# Then, convert to factors with descriptive labels
+Equity_RSE$CompQuinFactor <- factor(Equity_RSE$CompQuinNum,
+                                    levels = 1:5,
+                                    labels = c(
+                                      "0th-20th percentile (Lowest Equity Priority)",
+                                      "20th-40th percentile (Second Lowest Equity Priority)",
+                                      "40th-60th percentile (Middle Equity Priority)",
+                                      "60th-80th percentile (Second Highest Equity Priority)",
+                                      "80th-100th percentile (Highest Equity Priority)"
+                                    ))
+
+# Assuming that you have a vector of unique values for each Quin like the following:
+# unique_racequin_values, unique_socioquin_values, unique_healthquin_values
+
+# Create a named vector that maps text values to numeric values for each Quin
+racequin_map <- setNames(1:5, unique_racequin_values[!is.na(unique_racequin_values)])
+socioquin_map <- setNames(1:5, unique_socioquin_values[!is.na(unique_socioquin_values)])
+healthquin_map <- setNames(1:5, unique_healthquin_values[!is.na(unique_healthquin_values)])
+
+# Map the original text values to a numeric scale for each Quin
+Equity_RSE$RaceQuinNum <- unname(racequin_map[Equity_RSE$RaceQuin])
+Equity_RSE$SocioQuinNum <- unname(socioquin_map[Equity_RSE$SocioQuin])
+Equity_RSE$HealthQuinNum <- unname(healthquin_map[Equity_RSE$HealthQuin])
+
+# Convert the numeric values to factors with descriptive labels for each Quin
+Equity_RSE$RaceQuinFactor <- factor(Equity_RSE$RaceQuinNum,
+                                    levels = 1:5,
+                                    labels = c(
+                                      "0th-20th percentile (Lowest Equity Priority)",
+                                      "20th-40th percentile (Second Lowest Equity Priority)",
+                                      "40th-60th percentile (Middle Equity Priority)",
+                                      "60th-80th percentile (Second Highest Equity Priority)",
+                                      "80th-100th percentile (Highest Equity Priority)"
+                                    ))
+Equity_RSE$SocioQuinFactor <- factor(Equity_RSE$SocioQuinNum,
+                                     levels = 1:5,
+                                     labels = c(
+                                       "0th-20th percentile (Lowest Equity Priority)",
+                                       "20th-40th percentile (Second Lowest Equity Priority)",
+                                       "40th-60th percentile (Middle Equity Priority)",
+                                       "60th-80th percentile (Second Highest Equity Priority)",
+                                       "80th-100th percentile (Highest Equity Priority)"
+                                     ))
+Equity_RSE$HealthQuinFactor <- factor(Equity_RSE$HealthQuinNum,
+                                      levels = 1:5,
+                                      labels = c(
+                                        "0th-20th percentile (Lowest Equity Priority)",
+                                        "20th-40th percentile (Second Lowest Equity Priority)",
+                                        "40th-60th percentile (Middle Equity Priority)",
+                                        "60th-80th percentile (Second Highest Equity Priority)",
+                                        "80th-100th percentile (Highest Equity Priority)"
+                                      ))
+
+# View the structure of the new factors to confirm they've been created correctly
+str(Equity_RSE$RaceQuinFactor)
+str(Equity_RSE$SocioQuinFactor)
+str(Equity_RSE$HealthQuinFactor)
+
+
+# Display the first few rows to verify the changes
+head(Equity_RSE)
+
+# Saving the processed data back to a shapefile
+#st_write(Equity_RSE, '../Data/Equity_RSE.shp', delete_layer = TRUE)
+
+
+```
+
+
+```{r}
+#unique_values <- unique()
+#print(unique_values)
+
+colnames(PSE)
+colnames(Equity_RSE)
+
+```
+
+
+
+
+```{r dynamic sector graph for Emissions Per Account}
+
+library(dplyr)
+library(leaflet)
+library(scales)  # For colorQuantile
+
+# Assuming PSE is your dataset
+# Filter the data for 'Sector' = 'Residential' and 'CAL_YEAR' = 2023
+filtered_PSE <- PSE %>%
+  filter(Sector == "Residential", CAL_YEAR == 2023)
+
+# Now use this filtered dataset in your leaflet map
+leaflet(filtered_PSE) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor = ~colorQuantile("YlOrRd", `Emissions Per Account`)(`Emissions Per Account`),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = ~paste0("Emissions: ", `Emissions Per Account`),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")
+  ) %>%
+  addLegend(
+    pal = colorQuantile("YlOrRd", filtered_PSE$`Emissions Per Account`, n = 4),
+    values = ~`Emissions Per Account`,
+    opacity = 0.7,
+    title = "Emissions Per Account",
+    position = "bottomright")
+
+
+```
+
+
+
+
+```{r}
+
+library(leaflet)
+library(sf)
+
+# Assuming 'Equity_RSE' is your cleaned and loaded spatial dataset
+
+# Define a color palette for the factor levels of CompQuin using the provided hex colors
+quin_colors <- colorFactor(
+  palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
+  domain = Equity_RSE$CompQuinFactor
+)
+
+# Create the Leaflet map
+leaflet(Equity_RSE) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%  # Adding a light-themed tile layer
+  addPolygons(
+    fillColor = ~quin_colors(CompQuinFactor),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(
+      weight = 3,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE
+    ),
+    label = ~as.character(CompQuinFactor),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "13px",
+      direction = "auto"
+    )
+  ) %>%
+  addLegend(
+    pal = quin_colors,
+    values = ~CompQuinFactor,
+    opacity = 0.7,
+    title = "Equity Priority",
+    position = "bottomright"
+  )
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
