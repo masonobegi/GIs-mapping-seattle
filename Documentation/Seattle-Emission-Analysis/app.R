@@ -8,7 +8,7 @@ library(RColorBrewer)
  
 
 # Data
-PSE <- st_read("../../Data/PSE.shp")
+PSE_TEST <- st_read("../../Data/PSE.shp")
 Equity_TEST <- st_read("../../Data/Equity_RSE.shp")
 PSE2023_TEST<-st_read("../../Data/PSE2023.shp")
 
@@ -374,7 +374,7 @@ server <- function(input, output, session) {
   
   residential_lm <- lm(Average_Median_EUI ~ Year, data = residential_data_year)
   
-  general_lm <- lm(Average_Median_EUI ~ Year, data = combined_data_year)
+  general_lm <- lm(Average_Median_EUI ~ Year, data = general_data_year)
   
   
   
