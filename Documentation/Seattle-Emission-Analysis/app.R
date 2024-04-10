@@ -37,14 +37,14 @@ ui <- fluidPage(
                  tabPanel("Reduced Emissions",
                           fluidPage(
                             fluidRow(
-                              column(6,
-                                textOutput("graphTitle1"),
-                                leafletOutput("emissions2023")
-                                ),
-                              column(6,
-                                     textOutput("graphTitle2"),
-                                     leafletOutput("reducedEPAmap")
-                                )
+                              HTML("<br/>"),
+                              tags$b(textOutput("graphTitle1")),
+                              HTML("<br/>"),
+                              leafletOutput("emissions2023"),
+                              HTML("<br/>"),
+                              tags$b(textOutput("graphTitle2")),
+                              HTML("<br/>"),
+                              leafletOutput("reducedEPAmap")
                         
                             )
                           )
@@ -96,11 +96,11 @@ server <- function(input, output, session) {
   })
   
   output$graphTitle1 <- renderText({
-    "Emissions Per Capita in 2023 \n"
+    "Emissions Per Account in 2023 \n"
   })
   
   output$graphTitle2 <- renderText({
-    "Idealistic Gas Emissions Per Capita Reduced by 39% \n"
+    "Emissions Per Account Reduced by 39% \n"
   })
   
   output$reductionInfo<-renderText({
@@ -112,7 +112,7 @@ server <- function(input, output, session) {
     data <- filteredDataEmissions()
     emissionsPalette <- colorQuantile(c("green", "yellow", "red"),
                                       domain = data$`Emissions Per Account`,
-                                      n = 5)
+                                      n = 3)
     
     leaflet(data) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
