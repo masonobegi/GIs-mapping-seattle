@@ -242,7 +242,8 @@ ggplot(data = forecasting_grocery, aes(x = Year, y = Percentile_25th_EUI)) +
 lm_grocery_mod_75 <- lm(forecasting_grocery$Percentile_75th_EUI ~ Year, data = forecasting_grocery)
 
 predicted_eui_grocery <- predict(lm_grocery_mod_75, newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
-predicted_eui_grocery
+predicted_eui_grocery 
+#test
 ```
 
 ```{r}
