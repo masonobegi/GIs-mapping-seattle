@@ -39,11 +39,11 @@ ui <- fluidPage(
                             fluidRow(
                               column(6,
                                 textOutput("graphTitle1"),
-                                leafletOutput("reducedEPAmap")
+                                leafletOutput("emissions2023")
                                 ),
                               column(6,
                                      textOutput("graphTitle2"),
-                                     leafletOutput("reducedTotalmap")
+                                     leafletOutput("reducedEPAmap")
                                 )
                         
                             )
@@ -96,11 +96,11 @@ server <- function(input, output, session) {
   })
   
   output$graphTitle1 <- renderText({
-    "Idealistic Gas Emissions Per Capita Reduced by 39% \n"
+    "Emissions Per Capita in 2023 \n"
   })
   
   output$graphTitle2 <- renderText({
-    "Gas Emissions Per Capita Reduced by 39% \n"
+    "Idealistic Gas Emissions Per Capita Reduced by 39% \n"
   })
   
   output$reductionInfo<-renderText({
@@ -112,7 +112,7 @@ server <- function(input, output, session) {
     data <- filteredDataEmissions()
     emissionsPalette <- colorQuantile(c("green", "yellow", "red"),
                                       domain = data$`Emissions Per Account`,
-                                      n = 3)
+                                      n = 5)
     
     leaflet(data) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
@@ -180,14 +180,14 @@ server <- function(input, output, session) {
   
   #reduced emissions by proportion
   output$reducedEPAmap <- renderLeaflet({
-    emissionsReducedPalette <- colorQuantile(c("green", "yellow", "red"),#c("0-20%" = "#2dc937", "20-40%" = "#99c140", "40-60%" = "#e7b416", "60-80%" = "#db7b2b", "80-100%" = '#cc3232')
-                                     domain = PSE2023$`Emissions Per Account`,
-                                     n = 3)
-    
+    emissionsPalette <- colorFactor(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
+                                    domain = PSE2023$Emissions_Percentile)
+    emissionsReducedPalette <- colorFactor(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
+                                           domain = PSE2023$Emissions_Percentile_Reduced)
     leaflet(PSE2023) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
       addPolygons(
-        fillColor = ~emissionsReducedPalette(epa_reduced),
+        fillColor = ~emissionsReducedPalette(Emissions_Percentile_Reduced),
         weight = 2,
         opacity = 1,
         color = "white",
@@ -205,23 +205,23 @@ server <- function(input, output, session) {
           textsize = "15px",
           direction = "auto")
       ) %>%
-      addLegend(pal = emissionsReducedPalette, 
-                values = ~epa_reduced,
-                opacity = 0.7, 
-                title = "Reduced Emissions Per Account",
-                position = "bottomright")
+      addLegend(
+        pal = emissionsPalette,
+        values = ~Emissions_Percentile_Reduced,
+        opacity = 0.7,
+        title = "Emissions Per Account",
+        position = "bottomright",
+        labels = labels)
   })
   
-  #reduced emissions by 39% across
-  output$reducedTotalmap <- renderLeaflet({
-    ReducedTotalPalette <- colorQuantile(c("green", "yellow", "red"),
-                                             domain = PSE2023$`Emissions Per Account`,
-                                             n = 3)
-    
+  output$emissions2023 <- renderLeaflet({
+    emissionsPalette <- colorFactor(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
+                                    domain = PSE2023$Emissions_Percentile)
+
     leaflet(PSE2023) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
       addPolygons(
-        fillColor = ~ReducedTotalPalette(epa_reduced_total),
+        fillColor = ~emissionsPalette(Emissions_Percentile),
         weight = 2,
         opacity = 1,
         color = "white",
@@ -239,12 +239,16 @@ server <- function(input, output, session) {
           textsize = "15px",
           direction = "auto")
       ) %>%
-      addLegend(pal = ReducedTotalPalette, 
-                values = ~epa_reduced_total,
-                opacity = 0.7, 
-                title = "Reduced Emissions Per Account",
-                position = "bottomright")
+      addLegend(
+        pal = emissionsPalette,
+        values = ~Emissions_Percentile,
+        opacity = 0.7,
+        title = "Emissions Per Account",
+        position = "bottomright",
+        labels = labels)
   })
+  
+ 
 }
 
 # Run Application
