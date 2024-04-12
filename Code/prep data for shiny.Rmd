@@ -92,11 +92,9 @@ PSE2023 <- PSE2023 %>%
 
 
 # Write a clean shp file to be used directly in Shiny
-<<<<<<< HEAD
+
 #st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
-=======
-st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
->>>>>>> workspace/Bogi
+
 ```
 
 
