@@ -37,13 +37,13 @@ PSE <- PSE %>%
 PSE2023 <- PSE[PSE$CAL_YEAR==2023,]
 
 
+
 PSE <- PSE %>%
   mutate(`Gas Consumption Percentile` = ntile(`Gas Consumption`, 100),
          `User Accounts Percentile` = ntile(`User Accounts`, 100),
          `Gas Emissions Percentile` = ntile(`Gas Emissions`, 100),
          `Gas Usage Per Account Percentile` = ntile(`Gas Usage Per Account`, 100),
          `Emissions Per Account Percentile` = ntile(`Emissions Per Account`, 100))
-
 
 
 # Write a clean shp file to be used directly in Shiny
@@ -66,13 +66,33 @@ PSE2023<-PSE2023 %>% mutate(epa_reduced_total = `Emissions Per Account` * (1-0.3
 
 head(PSE2023)
 
+
+quantiles <- quantile(PSE2023$`Emissions Per Account`, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+
+# Create breaks with -Inf and Inf to capture everything below and above the quantiles
+breaks <- c(-Inf, quantiles, Inf)
+
+# Ensure we have the correct number of labels for the number of intervals created by the breaks
+labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
+# Cut the Emissions_ data into bins based on these percentiles
+PSE2023$Emissions_Percentile_Reduced <- cut(PSE2023$epa_reduced, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+PSE2023$Emissions_Percentile <- cut(PSE2023$`Emissions Per Account`, 
+                                           breaks = c(-Inf, quantiles, Inf), 
+                                           include.lowest = TRUE, 
+                                           labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
+
 PSE2023 <- PSE2023 %>%
   mutate(`EPA` = ntile(`epa_reduced`, 100),
-         `EPA_total` = ntile(`epa_reduced_total`, 100)
+         `EPA_total` = ntile(`epa_reduced_total`, 100),
+         `Emissions Per Account Percentile` = ntile(`Emissions Per Account`, 100)
          )
 
+
 # Write a clean shp file to be used directly in Shiny
-#st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
+st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
 ```
 
 
@@ -204,7 +224,7 @@ library(scales)  # For colorQuantile
 # Assuming PSE is your dataset
 # Filter the data for 'Sector' = 'Residential' and 'CAL_YEAR' = 2023
 filtered_PSE <- PSE %>%
-  filter(Sector == "Residential", CAL_YEAR == 2023)
+  filter(Sector == "Industrial", CAL_YEAR == 2023)
 
 # Now use this filtered dataset in your leaflet map
 leaflet(filtered_PSE) %>%
@@ -307,17 +327,17 @@ reduced_pse_2023<-reduced_pse_2023 %>% mutate(EMISSIONSP_reduced = EMISSIONSP * 
 
 
 
+
 ```{r reduced emissions per capita}
-quantiles <- quantile(reduced_pse_2023$EMISSIONSP, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+quantiles <- quantile(PSE2023$`Emissions Per Account`, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
 
 # Create breaks with -Inf and Inf to capture everything below and above the quantiles
 breaks <- c(-Inf, quantiles, Inf)
 
 # Ensure we have the correct number of labels for the number of intervals created by the breaks
 labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
-
 # Cut the Emissions_ data into bins based on these percentiles
-reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$EMISSIONSP_reduced, 
+PSE2023$Emissions_Percentile <- cut(PSE2023$epa_reduced, 
                                            breaks = c(-Inf, quantiles, Inf), 
                                            include.lowest = TRUE, 
                                            labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
@@ -325,7 +345,7 @@ reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$EMISSIONSP_reduced
 # Plot the map with emissions categorized by percentiles
 ggplot() +
   geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
-  geom_sf(data = reduced_pse_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  geom_sf(data = PSE2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
   scale_fill_manual(
     values = c("0-20%" = "#2dc937", "20-40%" = "#99c140", "40-60%" = "#e7b416", "60-80%" = "#db7b2b", "80-100%" = '#cc3232'),
     name = "Gas Emissions\n(Percentiles)"
@@ -335,6 +355,7 @@ ggplot() +
   theme(legend.position = "bottom") +
   coord_sf(datum = NA)
 
+head(PSE2023)
 ```
 
 ```{r reduced 39% across}
@@ -373,11 +394,156 @@ ggplot() +
 
 ```
 ```{r}
-print(sum(reduced_pse_2023$EMISSIONSP_reduced_total)/sum(reduced_pse_2023$EMISSIONSP))
+
+# Now use this filtered dataset in your leaflet map
+leaflet(PSE2023) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor = ~colorQuantile("YlOrRd", `Emissions Per Account`)(`Emissions Per Account`),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = ~paste0("Emissions: ", `Emissions Per Account`),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")
+  ) %>%
+  addLegend(
+    pal = colorQuantile("YlOrRd", PSE2023$`Emissions Per Account`, n = 4),
+    values = ~`Emissions Per Account`,
+    opacity = 0.7,
+    title = "Emissions Per Account",
+    position = "bottomright")
 
 ```
 
 
+```{r}
+# Now use this filtered dataset in your leaflet map
+reducedPalette <- colorQuantile(c("#2dc937", "#99c140", "#e7b416","#db7b2b", '#cc3232'),
+                                     domain = PSE2023$Emissions_Percentile,
+                                     n = 5)
+leaflet(PSE2023) %>%
+  addTiles() %>%
+  addPolygons(
+    fillColor =~reducedPalette(Emissions_Percentile),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = ~paste0("Emissions: ", `Emissions Per Account`),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")
+  ) %>%
+  addLegend(
+    pal = c("0-20%" = "#2dc937", "20-40%" = "#99c140", "40-60%" = "#e7b416", "60-80%" = "#db7b2b", "80-100%" = '#cc3232'),5,
+    values = ~Emissions_Percentile,
+    opacity = 0.7,
+    title = "Emissions Per Account",
+    position = "bottomright")
+
+```
+
+
+```{r}
+emissionsPalette <- colorFactor(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
+                                 domain = PSE2023$Emissions_Percentile)
+
+# Create the leaflet map
+leaflet(PSE2023) %>%
+  #addTiles() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~emissionsPalette(Emissions_Percentile),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = ~paste0("Emissions: ", `Emissions Per Account`),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")
+  ) %>%
+  addLegend(
+    pal = emissionsPalette,
+    values = ~Emissions_Percentile,
+    opacity = 0.7,
+    title = "Emissions Per Account",
+    position = "bottomright",
+    labels = labels
+  )
+```
+```{r}
+# Define the breaks and labels for percentiles
+#quantiles <- quantile(PSE2023$`Emissions Per Account`, probs = seq(0, 1, by = 0.2), na.rm = TRUE)
+#breaks <- c(-Inf, quantiles, Inf)
+#labels <- c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%")
+
+# Cut the data into bins based on percentiles
+#PSE2023$Emissions_Percentile <- cut(PSE2023$`Emissions Per Account`, breaks = breaks, labels = labels, include.lowest = TRUE)
+
+# Define the color palette for leaflet
+emissionsReducedPalette <- colorFactor(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
+                                 domain = PSE2023$Emissions_Percentile_Reduced)
+
+# Create the leaflet map
+leaflet(PSE2023) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~emissionsReducedPalette(Emissions_Percentile_Reduced),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = ~paste0("Emissions: ", `Emissions Per Account`),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")
+  ) %>%
+  addLegend(
+    pal = emissionsPalette,
+    values = ~Emissions_Percentile_Reduced,
+    opacity = 0.7,
+    title = "Emissions Per Account",
+    position = "bottomright",
+    labels = labels
+  )
+
+```
 
 
 
