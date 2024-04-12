@@ -107,4 +107,42 @@ target_perc_reduc
 ```
 Even if we did it in only the target stores (under 80 ES score or no significant improvement in energy reduction over the last few years) then it would still be almost 1% across the entire City of Seattle
 
+```{r}
+s2022 = s2022 %>% mutate(Adj_EUI = SourceEUIWN.kBtu.sf. - (SourceEUIWN.kBtu.sf.* 0.40))
+
+```
+
+```{r}
+data2022 = data2022 %>%
+  mutate(Median_Source_EUI = ifelse(BuildingType == "Supermarket/Grocery Store", 
+                                 Median_Source_EUI * 0.6, 
+                                 Median_Source_EUI))
+
+```
+
+```{r}
+top_quan2022 = quantile(data2022$Median_Source_EUI,0.75)
+high_impact_buildings_2022 = data2022 %>%
+  filter(Median_Source_EUI >= top_quan2022)%>%
+  arrange(desc(Median_Source_EUI))
+
+ggplot(high_impact_buildings_2022, aes(x = reorder(BuildingType, -Median_Source_EUI), y = Median_Source_EUI)) +
+  geom_bar(stat = "identity", fill = "dodgerblue3") +
+  labs(
+    x = NULL,
+    y = "Median Source EUI",
+    title = "High-Impact Building Types Based on Median Source EUI",
+    subtitle = "EUI: Energy use intensity measured per unit of floor area",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    plot.caption = element_text(hjust = 0.5, size = 8)
+  ) +
+  scale_y_continuous(labels = scales::comma)
+```
 
