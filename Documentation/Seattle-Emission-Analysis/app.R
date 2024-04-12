@@ -5,6 +5,7 @@ library(sf)
 library(dplyr)
 library(scales)
 library(RColorBrewer)
+library(ggplot2)
  
 
 # Data
