@@ -9,6 +9,7 @@ install.packages("tidyverse")
 install.packages("dplyr")
 library(tidyverse)
 library(dplyr)
+library(ggplot2)
 ```
 
 
@@ -60,8 +61,88 @@ s2022 = s2022 %>% filter(!is.na(SourceEUIWN.kBtu.sf.))
 target_stores = s2022 %>% filter(ENERGYSTARScore < 80)
 ```
 
+```{r}
+data2022 = read.csv("../Data/Performance_Ranges_by_Building_Type_2022.csv")
+data2022 = na.omit(data2022)
+top_quan2022 = quantile(data2022$Median_Source_EUI,0.75)
+high_impact_buildings_2022 = data2022 %>%
+  filter(Median_Source_EUI >= top_quan2022)%>%
+  arrange(desc(Median_Source_EUI))
+
+ggplot(high_impact_buildings_2022, aes(x = reorder(BuildingType, -Median_Source_EUI), y = Median_Source_EUI)) +
+  geom_bar(stat = "identity", fill = "dodgerblue3") +
+  labs(
+    x = NULL,
+    y = "Median Source EUI",
+    title = "High-Impact Building Types Based on Median Source EUI",
+    subtitle = "EUI: Energy use intensity measured per unit of floor area",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    plot.caption = element_text(hjust = 0.5, size = 8)
+  ) +
+  scale_y_continuous(labels = scales::comma) # This will add commas to y-axis labels for readability
+```
 
 
+```{r}
+stores_source_EUI = sum(stores2022$SourceEUIWN.kBtu.sf.,na.rm = TRUE)
+all_source_EUI = sum(Bench2022$SourceEUIWN.kBtu.sf.,na.rm = TRUE)
+max_reduc = stores_source_EUI * 0.4
+perc_reduc = (max_reduc / all_source_EUI) * 100
+perc_reduc
+```
+If grocery stores can reduce energy use by 40 percent, It would result in 1.5% total energy use reduction for the entire city of Seattle across all building types
 
+```{r}
+target_stores_EUI = sum(target_stores$SourceEUIWN.kBtu.sf.)
+target_reduc = target_stores_EUI * 0.4
+target_perc_reduc = (target_reduc / all_source_EUI) * 100
+target_perc_reduc
+```
+Even if we did it in only the target stores (under 80 ES score or no significant improvement in energy reduction over the last few years) then it would still be almost 1% across the entire City of Seattle
 
+```{r}
+s2022 = s2022 %>% mutate(Adj_EUI = SourceEUIWN.kBtu.sf. - (SourceEUIWN.kBtu.sf.* 0.40))
+
+```
+
+```{r}
+data2022 = data2022 %>%
+  mutate(Median_Source_EUI = ifelse(BuildingType == "Supermarket/Grocery Store", 
+                                 Median_Source_EUI * 0.6, 
+                                 Median_Source_EUI))
+
+```
+
+```{r}
+top_quan2022 = quantile(data2022$Median_Source_EUI,0.75)
+high_impact_buildings_2022 = data2022 %>%
+  filter(Median_Source_EUI >= top_quan2022)%>%
+  arrange(desc(Median_Source_EUI))
+
+ggplot(high_impact_buildings_2022, aes(x = reorder(BuildingType, -Median_Source_EUI), y = Median_Source_EUI)) +
+  geom_bar(stat = "identity", fill = "dodgerblue3") +
+  labs(
+    x = NULL,
+    y = "Median Source EUI",
+    title = "High-Impact Building Types Based on Median Source EUI",
+    subtitle = "EUI: Energy use intensity measured per unit of floor area",
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    plot.caption = element_text(hjust = 0.5, size = 8)
+  ) +
+  scale_y_continuous(labels = scales::comma)
+```
 
