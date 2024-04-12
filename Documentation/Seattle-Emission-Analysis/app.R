@@ -99,7 +99,7 @@ ui <- fluidPage(
   titlePanel("Seattle Energy Project"),
   mainPanel(
     tabsetPanel(
-      tabPanel("Overview", "Overview content will be placed here."),
+      tabPanel("Overview", "Seattle, like many cities around the world are looking at how to reduce their emissions. This project looks at the problem through 2 lenses, geospatial analysis and forecasting. Geospatial wise, this project looks at whether factors such as socioeconomic disparity play a factor in what parts of the city have higher emissions. Forecasting wise, this project tries to look at overall trends from the entire city of Seattle and it's building types. In the conclusion of this project, there will be a clear idea of whether or not socioeconomic factors, types of buildings or another factor is a major contributor to emissions in Seattle."),
       tabPanel("GIS Analysis", 
                tabsetPanel(
                  tabPanel("Emissions Per Account", 
