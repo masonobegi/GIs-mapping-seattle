@@ -140,7 +140,7 @@ ui <- fluidPage(
                plotOutput("Regression_Model"), 
                tableOutput("Summary_lm")
              )
-             )
+          )
   )
 ))
 
