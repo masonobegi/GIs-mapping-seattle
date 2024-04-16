@@ -137,8 +137,7 @@ ui <- fluidPage(
     tabPanel("Median EUI Models", 
              fluidPage(
                selectInput("regression_selection", "Select Building Type", choice = c("general", "commercial", "industrial", "residential")), 
-               plotOutput("Regression_Model"), 
-               tableOutput("Summary_lm")
+               plotOutput("Regression_Model")
              )
           )
   )
@@ -385,26 +384,18 @@ server <- function(input, output, session) {
     name_pred <- paste0("predicted_eui_", toString(input$regression_selection))
     name_data <- paste0(toString(input$regression_selection), "_data_year")
     name_lm <-paste0(toString(input$regression_selection), "_lm")
-    pred <- predict(get(name_lm), newdata = data.frame(Year = c(2023, 2024, 2025, 2026, 2027)))
-    
-    
+    pred <- predict(get(name_lm), newdata = data.frame(Year = c(2022, 2023, 2024, 2025, 2026, 2027)))
+
     ggplot(data = get(name_data), aes(x = Year, y = Average_Median_EUI)) +
       scale_x_continuous(breaks = seq(2016, 2027,by = 1)) +
       geom_point() + 
       geom_smooth(method = 'lm') + 
-      geom_point(data = data.frame(Year = c(2023,2024,2025,2026,2027), Predicted_EUI = pred), aes(x = Year, y = Predicted_EUI)) + 
+      geom_point(data = data.frame(Year = c(2023,2024,2025,2026,2027), Predicted_EUI = pred[-1]), aes(x = Year, y = Predicted_EUI)) + 
+      geom_line(data = data.frame(Year = c(2022, 2023,2024,2025,2026,2027), Predicted_EUI = pred),aes(x = Year, y = Predicted_EUI), linetype = "dashed") +
       labs(title = paste0("Average ", input$regression_selection, " EUI by Year"), x = "Year", y = paste0("Average ", input$regression_selection, " EUI"))
     
   })
   
-  output$Summary_lm <- renderTable ({
-    req(input$regression_selection)
-    name_lm <-paste0(toString(input$regression_selection), "_lm")
-    summary_data <- summary(get(name_lm))$coefficients
-    as.data.frame(summary_data)
-
-    
-  })
  
 }
 
