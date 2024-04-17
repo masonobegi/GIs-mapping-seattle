@@ -175,7 +175,7 @@ combined_sum_EUI <- bind_rows(current_sum_EUI_2022, current_sum_EUI_2021, curren
 current_combined_stores <- combined_sum_EUI %>% 
   filter(BuildingType %in% c("Supermarket", "Supermarket/Grocery Store"))
 
-reduced_sum_EUI_2022 = sum_EUI_2022 %>%
+reduced_sum_EUI_2022 = current_sum_EUI_2022 %>%
   mutate(Median_Source_EUI = ifelse(BuildingType == "Supermarket/Grocery Store", 
                                     Median_Source_EUI * 0.6, 
                                     Median_Source_EUI))
