@@ -3,7 +3,7 @@ library(shiny)
 library(dplyr)
 library(ggplot2)
 
-
+#Connor using Kalin's data for Grocery models
 #Loading in .csv files
 Benchmarking2016 <- read.csv("../../Data/2016_Building_Energy_Benchmarking.csv", header = TRUE)
 Benchmarking2017 <- read.csv("../../Data/2017_Building_Energy_Benchmarking.csv", header = TRUE)
@@ -22,6 +22,7 @@ Bench2020 <- subset(Benchmarking2020, select = -c(ComplianceIssue) )
 Bench2021 <- subset(Benchmarking2021, select = -c(ComplianceIssue) )
 Bench2022 <- subset(Benchmarking2022, select = -c(ComplianceIssue) )
 
+#create current EUI models for building types
 current_sum_EUI_2022 <- Bench2022 %>%
   filter(!is.na(SourceEUI.kBtu.sf.)) %>%
   group_by(LargestPropertyUseType) %>% 
@@ -78,15 +79,11 @@ current_sum_EUI_2016 <- Bench2016 %>%
   rename(BuildingType = LargestPropertyUseType) %>%
   mutate(Year = 2016)
 
+#Combined data to be used in models
 combined_sum_EUI <- bind_rows(current_sum_EUI_2022, current_sum_EUI_2021, current_sum_EUI_2020, current_sum_EUI_2019, current_sum_EUI_2018, current_sum_EUI_2017, current_sum_EUI_2016)
 
 current_combined_stores <- combined_sum_EUI %>% 
   filter(BuildingType %in% c("Supermarket", "Supermarket/Grocery Store"))
-
-
-
-
-
 
 reduced_sum_EUI_2022 = sum_EUI_2022 %>%
   mutate(Median_Source_EUI = ifelse(BuildingType == "Supermarket/Grocery Store", 
