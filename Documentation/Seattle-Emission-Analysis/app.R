@@ -6,6 +6,7 @@ library(dplyr)
 library(scales)
 library(RColorBrewer)
 library(ggplot2)
+library(car)
  
 
 # Data
@@ -228,7 +229,8 @@ ui <- fluidPage(
     tabPanel("Median EUI Models", 
              fluidPage(
                selectInput("regression_selection", "Select Building Type", choice = c("general", "commercial", "industrial", "residential")), 
-               plotOutput("Regression_Model")
+               plotOutput("Regression_Model"), 
+               textOutput("Durbin")
              )
           ),
     tabPanel("Grocery Store Recommendations", 
@@ -496,6 +498,15 @@ server <- function(input, output, session) {
       labs(title = paste0(input$regression_selection, " Median EUI by Year"), x = "Year", y = paste0(input$regression_selection, " Median EUI"))
     
   })
+  
+  output$Durbin <- renderText({
+    req(input$regression_selection)
+    name_durbin <- paste0(toString(input$regression_selection), "_forecast")
+    durb <- durbinWatsonTest(as.numeric(residuals(get(name_durbin))))
+    paste0("Durbin Watson Test value: ",toString(durb))
+  })
+  
+  
   output$building_model <- renderPlot({
     req(input$model_selection)
     
