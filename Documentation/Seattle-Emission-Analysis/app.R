@@ -463,13 +463,20 @@ server <- function(input, output, session) {
     filter(Year != 2020)
   
   
-  commercial_lm <-lm(Average_Median_EUI ~ Year, data = commercial_data_year)
+  industrial_forecast <- auto.arima(industrial_data_year$Average_Median_EUI)
+  residential_forecast <- auto.arima(residential_data_year$Average_Median_EUI)
+  commercial_forecast <- auto.arima(commercial_data_year$Average_Median_EUI)
+  general_forecast <- auto.arima(general_data_year$Average_Median_EUI)
   
-  industrial_lm <- lm(Average_Median_EUI ~ Year, data = industrial_data_year)
+  forecast_residential <- forecast(residential_forecast, h = 6)
+  forecast_industrial <- forecast(industrial_forecast, h = 6)
+  forecast_commercial <- forecast(commercial_forecast, h = 6)
+  forecast_general <- forecast(general_forecast, h = 6)
   
-  residential_lm <- lm(Average_Median_EUI ~ Year, data = residential_data_year)
-  
-  general_lm <- lm(Average_Median_EUI ~ Year, data = general_data_year)
+  forecast_residential_df <- data.frame(Year = c(2022,2023, 2024, 2025, 2026, 2027), Forecasted_EUI = forecast_residential$mean)
+  forecast_industrial_df <-data.frame(Year = c(2022,2023, 2024, 2025, 2026, 2027),Forecasted_EUI = forecast_industrial$mean)
+  forecast_commercial_df <-data.frame(Year = c(2022,2023, 2024, 2025, 2026, 2027),Forecasted_EUI = forecast_commercial$mean)
+  forecast_general_df <- data.frame(Year = c(2022,2023, 2024, 2025, 2026, 2027),Forecasted_EUI = forecast_general$mean)
   
   
   
@@ -478,19 +485,17 @@ server <- function(input, output, session) {
     
     name_pred <- paste0("predicted_eui_", toString(input$regression_selection))
     name_data <- paste0(toString(input$regression_selection), "_data_year")
-    name_lm <-paste0(toString(input$regression_selection), "_lm")
-    pred <- predict(get(name_lm), newdata = data.frame(Year = c(2022, 2023, 2024, 2025, 2026, 2027)))
-
-    ggplot(data = get(name_data), aes(x = Year, y = Average_Median_EUI)) +
+    name_fore <-paste0("forecast_", toString(input$regression_selection), "_df")
+    
+    
+    ggplot() +
       scale_x_continuous(breaks = seq(2016, 2027,by = 1)) +
-      geom_point() + 
-      geom_smooth(method = 'lm') + 
-      geom_point(data = data.frame(Year = c(2023,2024,2025,2026,2027), Predicted_EUI = pred[-1]), aes(x = Year, y = Predicted_EUI)) + 
-      geom_line(data = data.frame(Year = c(2022, 2023,2024,2025,2026,2027), Predicted_EUI = pred),aes(x = Year, y = Predicted_EUI), linetype = "dashed") +
-      labs(title = paste0("Average ", input$regression_selection, " EUI by Year"), x = "Year", y = paste0("Average ", input$regression_selection, " EUI"))
+      geom_line(data = get(name_data), aes(x = Year, y = Average_Median_EUI, color = "Actual"), show.legend = TRUE) + 
+      geom_line(data = get(name_fore), aes(x = Year, y = Forecasted_EUI, color = "Forecasted"), show.legend = TRUE) + 
+      scale_color_manual(name = "Lines", values = c("Actual" = "black", "Forecasted" = "red")) + 
+      labs(title = paste0(input$regression_selection, " Median EUI by Year"), x = "Year", y = paste0(input$regression_selection, " Median EUI"))
     
   })
-  
   output$building_model <- renderPlot({
     req(input$model_selection)
     
