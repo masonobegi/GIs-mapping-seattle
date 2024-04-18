@@ -194,21 +194,21 @@ ui <- fluidPage(
       tabPanel("Overview", "Seattle, like many cities around the world are looking at how to reduce their emissions. This project looks at the problem through 2 lenses, geospatial analysis and forecasting. Geospatial wise, this project looks at whether factors such as socioeconomic disparity play a factor in what parts of the city have higher emissions. Forecasting wise, this project tries to look at overall trends from the entire city of Seattle and it's building types. In the conclusion of this project, there will be a clear idea of whether or not socioeconomic factors, types of buildings or another factor is a major contributor to emissions in Seattle."),
       tabPanel("GIS Analysis", 
                tabsetPanel(
-                 tabPanel("Emissions Per Account", 
+                 tabPanel("Natural Gas Emissions Per Account", 
                           fluidPage(
                             selectInput("calYearEmissions", "Select Year:", choices = sort(unique(PSE$CAL_YEAR))),
                             leafletOutput("emissionsMap"),
                             verbatimTextOutput("emissionsInfo") # Text box for emissions info
                           )
                  ),
-                 tabPanel("Gas Usage Per Account",
+                 tabPanel("Natural Gas Usage Per Account",
                           fluidPage(
                             selectInput("calYearGasUsage", "Select Year:", choices = sort(unique(PSE$CAL_YEAR))),
                             leafletOutput("gasUsageMap"),
                             verbatimTextOutput("gasUsageInfo") # Text box for gas usage info
                           )
                  ),
-                 tabPanel("Reduced Emissions",
+                 tabPanel("Reduced Natural Gas Emissions",
                           fluidPage(
                             fluidRow(
                               HTML("<br/>"),
@@ -283,16 +283,13 @@ server <- function(input, output, session) {
   })
   
   output$graphTitle1 <- renderText({
-    "Emissions Per Account in 2023 \n"
+    "Natural Gas Emissions Per Account (MTCO2e) in 2023 \n"
   })
   
   output$graphTitle2 <- renderText({
-    "Emissions Per Account Reduced by 39% \n"
+    "Natural Gas Emissions Per Account Reduced (MTCO2e) by 39% \n"
   })
   
-  output$reductionInfo<-renderText({
-    paste0("")
-  })
   
   # Map for Emissions Per Account
   output$emissionsMap <- renderLeaflet({
@@ -325,7 +322,7 @@ server <- function(input, output, session) {
       addLegend(pal = emissionsPalette, 
                 values = ~`Emissions Per Account`,
                 opacity = 0.7, 
-                title = "Emissions Per Account",
+                title = "Natural Gas Emissions Per Account (MTCO2e)",
                 position = "bottomright")
   })
   
@@ -360,7 +357,7 @@ server <- function(input, output, session) {
       addLegend(pal = gasUsagePalette, 
                 values = ~`Gas Usage Per Account`,
                 opacity = 0.7, 
-                title = "Gas Usage Per Account",
+                title = "Natural Gas Usage Per Account (MMBtu)",
                 position = "bottomright")
   })
   

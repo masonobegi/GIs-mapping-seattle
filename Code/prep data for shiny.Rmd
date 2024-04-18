@@ -47,7 +47,7 @@ PSE <- PSE %>%
 
 
 # Write a clean shp file to be used directly in Shiny
-st_write(PSE, '../Data/PSE.shp', delete_layer = TRUE)
+#st_write(PSE, '../Data/PSE.shp', delete_layer = TRUE)
 
 head(PSE)
 ```
@@ -93,7 +93,7 @@ PSE2023 <- PSE2023 %>%
 
 # Write a clean shp file to be used directly in Shiny
 
-# st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
+#st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
 
 #st_write(PSE2023, '../Data/PSE2023.shp', delete_layer = TRUE)
 
@@ -355,7 +355,7 @@ ggplot() +
     values = c("0-20%" = "#2dc937", "20-40%" = "#99c140", "40-60%" = "#e7b416", "60-80%" = "#db7b2b", "80-100%" = '#cc3232'),
     name = "Gas Emissions\n(Percentiles)"
   ) +
-  labs(title = "Seattle Reduced Gas Emissions Per Capita for 2030") +
+  labs(title = "Reduced Natural Gas Emissions Per Capita (MTCO2e)") +
   theme_minimal() +
   theme(legend.position = "bottom") +
   coord_sf(datum = NA)
@@ -363,14 +363,11 @@ ggplot() +
 head(PSE2023)
 ```
 
-```{r reduced 39% across}
-reduced_pse_2023<-reduced_pse_2023 %>% mutate(EMISSIONSP_reduced_total = EMISSIONSP * (1-0.39))
-print(head(reduced_pse_2023))
 
-```
 
-```{r test: reduced emissions per capita with no proportions calculated - reduce all by 39%}
-quantiles <- quantile(reduced_pse_2023$EMISSIONSP, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
+```{r}
+
+quantiles <- quantile(PSE2023$`Emissions Per Account`, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
 
 # Create breaks with -Inf and Inf to capture everything below and above the quantiles
 breaks <- c(-Inf, quantiles, Inf)
@@ -379,7 +376,7 @@ breaks <- c(-Inf, quantiles, Inf)
 labels <- c("0-20%", "21-40%", "41-60%", "61-80%", "81-100%")
 
 # Cut the Emissions_ data into bins based on these percentiles
-reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$EMISSIONSP_reduced_total, 
+PSE2023$Emissions_Percentile <- cut(PSE2023$`Emissions Per Account`, 
                                            breaks = c(-Inf, quantiles, Inf), 
                                            include.lowest = TRUE, 
                                            labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))
@@ -387,19 +384,18 @@ reduced_pse_2023$Emissions_Percentile <- cut(reduced_pse_2023$EMISSIONSP_reduced
 # Plot the map with emissions categorized by percentiles
 ggplot() +
   geom_sf(data = seattle_base, fill = "white", color = "black", size = 0.1) +
-  geom_sf(data = reduced_pse_2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
+  geom_sf(data = PSE2023, aes(fill = Emissions_Percentile), size = 0.1, alpha = 0.5) +
   scale_fill_manual(
     values = c("0-20%" = "#2dc937", "20-40%" = "#99c140", "40-60%" = "#e7b416", "60-80%" = "#db7b2b", "80-100%" = '#cc3232'),
     name = "Gas Emissions\n(Percentiles)"
   ) +
-  labs(title = "Seattle Reduced Gas Emissions Per Capita for 2030 by total 39%") +
+  labs(title = "Natural Gas Emissions Per Capita (MTCO2e)") +
   theme_minimal() +
   theme(legend.position = "bottom") +
   coord_sf(datum = NA)
 
 ```
 ```{r}
-<<<<<<< HEAD
 
 # Now use this filtered dataset in your leaflet map
 leaflet(PSE2023) %>%
