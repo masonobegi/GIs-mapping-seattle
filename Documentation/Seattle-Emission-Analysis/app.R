@@ -7,6 +7,7 @@ library(scales)
 library(RColorBrewer)
 library(ggplot2)
 library(car)
+library(tools)
  
 
 # Data
@@ -495,7 +496,7 @@ server <- function(input, output, session) {
       geom_line(data = get(name_data), aes(x = Year, y = Average_Median_EUI, color = "Actual"), show.legend = TRUE) + 
       geom_line(data = get(name_fore), aes(x = Year, y = Forecasted_EUI, color = "Forecasted"), show.legend = TRUE) + 
       scale_color_manual(name = "Lines", values = c("Actual" = "black", "Forecasted" = "red")) + 
-      labs(title = paste0(input$regression_selection, " Median EUI by Year"), x = "Year", y = paste0(input$regression_selection, " Median EUI"))
+      labs(title = paste0(toTitleCase(input$regression_selection), " Median EUI by Year"), x = "Year", y = paste0(toTitleCase(input$regression_selection), " Median EUI"))
     
   })
   
