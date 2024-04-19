@@ -187,6 +187,21 @@ reduced_combined_stores = current_combined_stores %>%
                                     Median_Source_EUI * 0.6, 
                                     Median_Source_EUI))
 
+#KALINS DATA AND CLEANING
+
+#load Bench_cleaned
+Bench_cleaned = read.csv("../../Data/Bench_cleaned.csv")
+
+# Convert BuildingType to a factor
+Bench_cleaned$BuildingType <- factor(Bench_cleaned$BuildingType)
+
+#Convert Compliance Status to factor
+Bench_cleaned$ComplianceStatus[Bench_cleaned$ComplianceStatus == "Compliant"] <- 0
+Bench_cleaned$ComplianceStatus[Bench_cleaned$ComplianceStatus == "Not Compliant"] <- 1
+Bench_cleaned$ComplianceStatus <- factor(Bench_cleaned$ComplianceStatus)
+
+#Convert DataYear to factor
+Bench_cleaned$DataYear <- as.factor(Bench_cleaned$DataYear)
 
 # UI
 ui <- fluidPage(
@@ -239,6 +254,11 @@ ui <- fluidPage(
                selectInput("model_selection", "Select Grocery EUI Data", choice = c("current", "reduced")), 
                plotOutput("building_model"),
                plotOutput("time_model")
+             )
+    ), 
+    tabPanel("Greenhouse Gas Emissions by Year", 
+             fluidPage(
+               plotOutput("Kalin")
              )
     )
   )
@@ -550,6 +570,14 @@ server <- function(input, output, session) {
       scale_x_continuous(breaks = unique(reduced_combined_stores$Year))
     
     
+  })
+  
+  output$Kalin <- renderPlot ({
+    ggplot(Bench_cleaned, aes(x = DataYear, y = TotalGHGEmissions, group = 1)) +
+      geom_line(color = "blue") +
+      geom_point(color = "blue") +
+      labs(x = "Year", y = "Total GHG Emissions", title = "Total GHG Emissions Over Time") +
+      theme_minimal()
   })
  
 }
