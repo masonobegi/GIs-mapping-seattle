@@ -203,6 +203,8 @@ Bench_cleaned$ComplianceStatus <- factor(Bench_cleaned$ComplianceStatus)
 #Convert DataYear to factor
 Bench_cleaned$DataYear <- as.factor(Bench_cleaned$DataYear)
 
+Bench_cleaned_new <- Bench_cleaned[Bench_cleaned$TotalGHGEmissions <= 300000 & Bench_cleaned$SiteEUI.kBtu.sf. <= 600000, ]
+
 # UI
 ui <- fluidPage(
   titlePanel("Seattle Energy Project"),
@@ -573,7 +575,7 @@ server <- function(input, output, session) {
   })
   
   output$Kalin <- renderPlot ({
-    ggplot(Bench_cleaned, aes(x = DataYear, y = TotalGHGEmissions, group = 1)) +
+    ggplot(Bench_cleaned_new, aes(x = DataYear, y = TotalGHGEmissions, group = 1)) +
       geom_line(color = "blue") +
       geom_point(color = "blue") +
       labs(x = "Year", y = "Total GHG Emissions", title = "Total GHG Emissions Over Time") +
