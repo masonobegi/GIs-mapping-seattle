@@ -314,24 +314,6 @@ leaflet(Equity_RSE) %>%
 
 ```
 
-```{r calculate reduced emissions per capita by proportions with total 39%}
-#sum total emissions and total for each sector
-total_sum<-sum(reduced_pse_2023$EMISSIONSP)
-
-reduced_pse_2023<-reduced_pse_2023 %>% group_by(Sector) %>%
- mutate(reduction_fact = sum(EMISSIONSP) / total_sum * (1- 0.39))
-
-
-#multiply data by proportions to reduce
-#reduced_pse_2023$Emissions_reduced<-reduced_pse_2023$Emissions_ *reduced_pse_2023$reduction_fact
-reduced_pse_2023<-reduced_pse_2023 %>% mutate(EMISSIONSP_reduced = EMISSIONSP * reduction_fact)
-
-
-```
-
-
-
-
 
 ```{r reduced emissions per capita}
 quantiles <- quantile(PSE2023$`Emissions Per Account`, probs = seq(0.2, 0.8, by = 0.2), na.rm = TRUE)
