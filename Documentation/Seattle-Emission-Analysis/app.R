@@ -261,11 +261,13 @@ ui <- fluidPage(
     ), 
     tabPanel("Greenhouse Gas Emissions by Year", 
              fluidPage(
-               plotOutput("Kalin")
+               plotOutput("Kalin"), 
+               plotOutput("Kalin2")
              )
     )
   )
-))
+)
+)
 
 # Server
 server <- function(input, output, session) {
@@ -581,6 +583,28 @@ server <- function(input, output, session) {
       geom_point(color = "blue") +
       labs(x = "Year", y = "Total GHG Emissions", title = "Total GHG Emissions Over Time") +
       theme_minimal()
+  })
+  
+  output$Kalin2 <- renderPlot({
+    model <- lm(TotalGHGEmissions ~ PropertyGFATotal + SiteEUI.kBtu.sf. + ComplianceStatus + Electricity.kWh., data = Bench_cleaned)
+    
+    # Extract the predicted values
+    predicted_values <- predict(model)
+    
+    # Plot predicted values against observed values
+    plot(Bench_cleaned$TotalGHGEmissions, predicted_values,
+         xlab = "Observed Total GHG Emissions",
+         ylab = "Predicted Total GHG Emissions",
+         main = "Observed vs Predicted Total GHG Emissions",
+         col = "blue", pch = 16)
+    
+    # Add a reference line with slope 1 (perfect prediction)
+    abline(a = 0, b = 1, col = "red")
+    
+    # Add legend
+    legend("bottomright", legend = c("Predicted = Observed"), col = c("red"), pch = c(NA), lty = c(1), cex = 0.8)
+    
+    
   })
  
 }
