@@ -288,27 +288,32 @@ server <- function(input, output, session) {
   
   # Descriptive text for the Emissions Per Account tab
   output$emissionsInfo <- renderText({
-    paste0("The RSE Quintiles are divided as follows:\n",
+    paste0("Emissions are measured in MTCO2e (metric tons of carbon dioxide-equivalent) ",
+           "that result from gas usage measured in MMBtu (One million British Thermal Units). \n",
+           "Data comes from Puget Sound Energy (PSE), an energy utility, and contains aggregated data for natural gas usage across multiple census tracts to preserve privacy. \n\n",
+           "The RSE Quintiles are divided as follows:\n",
            "0th-20th percentile (Lowest Equity Priority)\n",
            "20th-40th percentile (Second Lowest Equity Priority)\n",
            "40th-60th percentile (Middle Equity Priority)\n",
            "60th-80th percentile (Second Highest Equity Priority)\n",
            "80th-100th percentile (Highest Equity Priority)\n\n",
-           "The Emissions Per Account color scale is divided into three quantile bins representing:",
-           "\n0% - 33% (green), \n33% - 67% (yellow), \n67% - 100% (red).")
+           "The Natural Gas Emissions Per Account color scale is divided into 5 bins.")
   })
+  
   
   # Descriptive text for the Gas Usage Per Account tab
   output$gasUsageInfo <- renderText({
-    paste0("The RSE Quintiles are divided as follows:\n",
+    paste0("Natural gas usage is measured in MMBtu (One million British Thermal Units). \n",
+           "Data comes from Puget Sound Energy (PSE), an energy utility, and contains aggregated data for natural gas usage across multiple census tracts to preserve privacy. \n\n",
+           "The RSE Quintiles are divided as follows:\n",
            "0th-20th percentile (Lowest Equity Priority)\n",
            "20th-40th percentile (Second Lowest Equity Priority)\n",
            "40th-60th percentile (Middle Equity Priority)\n",
            "60th-80th percentile (Second Highest Equity Priority)\n",
            "80th-100th percentile (Highest Equity Priority)\n\n",
-           "The Gas Usage Per Account color scale is divided into three quantile bins representing:",
-           "\n0% - 33% (green), \n33% - 67% (yellow), \n67% - 100% (red).")
+           "The Gas Usage Per Account color scale is divided into 5 bins.")
   })
+  
   
   output$graphTitle1 <- renderText({
     "Natural Gas Emissions Per Account (MTCO2e) in 2023 \n"
@@ -322,9 +327,9 @@ server <- function(input, output, session) {
   # Map for Emissions Per Account
   output$emissionsMap <- renderLeaflet({
     data <- filteredDataEmissions()
-    emissionsPalette <- colorQuantile(c("green", "yellow", "red"),
+    emissionsPalette <- colorQuantile(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
                                       domain = data$`Emissions Per Account`,
-                                      n = 3)
+                                      n = 5)
     
     leaflet(data) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
@@ -357,9 +362,9 @@ server <- function(input, output, session) {
   # Map for Gas Usage Per Account
   output$gasUsageMap <- renderLeaflet({
     data <- filteredDataGasUsage()
-    gasUsagePalette <- colorQuantile(c("green", "yellow", "red"),
+    gasUsagePalette <- colorQuantile(palette = c("#2dc937", "#99c140", "#e7b416", "#db7b2b", "#cc3232"),
                                      domain = data$`Gas Usage Per Account`,
-                                     n = 3)
+                                     n = 5)
     
     leaflet(data) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
@@ -388,6 +393,7 @@ server <- function(input, output, session) {
                 title = "Natural Gas Usage Per Account (MMBtu)",
                 position = "bottomright")
   })
+  
   
   
   #reduced emissions by proportion
