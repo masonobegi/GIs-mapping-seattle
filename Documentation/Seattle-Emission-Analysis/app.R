@@ -288,9 +288,12 @@ server <- function(input, output, session) {
   
   # Descriptive text for the Emissions Per Account tab
   output$emissionsInfo <- renderText({
-    paste0("Emissions are measured in MTCO2e (metric tons of carbon dioxide-equivalent) ",
-           "that result from gas usage measured in MMBtu (One million British Thermal Units). \n",
-           "Data comes from Puget Sound Energy (PSE), an energy utility, and contains aggregated data for natural gas usage across multiple census tracts to preserve privacy. \n\n",
+    paste0("Data comes from Puget Sound Energy (PSE), an energy utility, and contains aggregated data for natural gas usage across multiple census tracts to preserve privacy.\n",
+           "Emissions are measured in MTCO2e (metric tons of carbon dioxide-equivalent) ",
+           "that result from gas usage measured in MMBtu (One million British Thermal Units). \n\n",           
+           "The City of Seattle Racial and Social Equity Index (RSE) is a tool that uses recent census data to measure racial, economic, and health inequalities.\n",
+           "This index consists of three equally weighted sub-indices: race and language, economic status, and health.\n",
+           "These three sub-indices are combined to create the overall RSE Index and provide a clear picture of social equity across the city.  \n\n",
            "The RSE Quintiles are divided as follows:\n",
            "0th-20th percentile (Lowest Equity Priority)\n",
            "20th-40th percentile (Second Lowest Equity Priority)\n",
@@ -303,15 +306,18 @@ server <- function(input, output, session) {
   
   # Descriptive text for the Gas Usage Per Account tab
   output$gasUsageInfo <- renderText({
-    paste0("Natural gas usage is measured in MMBtu (One million British Thermal Units). \n",
-           "Data comes from Puget Sound Energy (PSE), an energy utility, and contains aggregated data for natural gas usage across multiple census tracts to preserve privacy. \n\n",
+    paste0("Data comes from Puget Sound Energy (PSE), an energy utility, and contains aggregated data for natural gas usage across multiple census tracts to preserve privacy. \n",
+           "Natural gas usage is measured in MMBtu (One million British Thermal Units). \n\n", 
+           "The City of Seattle Racial and Social Equity Index (RSE) is a tool that uses recent census data to measure racial, economic, and health inequalities.\n",
+           "This index consists of three equally weighted sub-indices: race and language, economic status, and health.\n",
+           "These three sub-indices are combined to create the overall RSE Index and provide a clear picture of social equity across the city.  \n\n",
            "The RSE Quintiles are divided as follows:\n",
            "0th-20th percentile (Lowest Equity Priority)\n",
            "20th-40th percentile (Second Lowest Equity Priority)\n",
            "40th-60th percentile (Middle Equity Priority)\n",
            "60th-80th percentile (Second Highest Equity Priority)\n",
            "80th-100th percentile (Highest Equity Priority)\n\n",
-           "The Gas Usage Per Account color scale is divided into 5 bins.")
+           "The Natural Gas Usage Per Account color scale is divided into 5 bins.")
   })
   
   
