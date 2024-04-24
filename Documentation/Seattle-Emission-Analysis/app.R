@@ -550,7 +550,7 @@ server <- function(input, output, session) {
     
     name_data <- paste0(toString(input$model_selection), "_sum_EUI_2022")
     
-    top_quan2022 = quantile(get(name_data)$Median_Source_EUI,0.75)
+    top_quan2022 = quantile(get(name_data)$Median_Source_EUI,0.9)
     high_impact_buildings_2022 = get(name_data) %>%
       filter(Median_Source_EUI >= top_quan2022) %>%
       arrange(desc(Median_Source_EUI))
@@ -560,17 +560,16 @@ server <- function(input, output, session) {
       labs(
         x = NULL,
         y = "Median Source EUI",
-        title = "Top 25% Building Types Based on Median Source EUI",
+        title = "Top Building Types Based on Median Source EUI",
         subtitle = "EUI: Energy use intensity measured per unit of floor area",
       ) +
       theme_minimal() +
       theme(
-        axis.text.x = element_text(angle = 45, hjust = 1),
         axis.title.x = element_text(size = 12, face = "bold"),
         axis.title.y = element_text(size = 12, face = "bold"),
         plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5, size = 10),
-        plot.caption = element_text(hjust = 0.5, size = 8)
+        plot.caption = element_text(hjust = 0.5, size = 12)
       ) +
       scale_y_continuous(labels = scales::comma)
   })
