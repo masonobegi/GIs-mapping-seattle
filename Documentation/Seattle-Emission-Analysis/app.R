@@ -566,6 +566,7 @@ server <- function(input, output, session) {
       theme_minimal() +
       theme(
         axis.title.x = element_text(size = 12, face = "bold"),
+        axis.text.x = element_text(size = 14, face = "bold"),
         axis.title.y = element_text(size = 12, face = "bold"),
         plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5, size = 10),
